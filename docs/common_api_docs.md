@@ -12,7 +12,6 @@
 interface CommonApiResponse<T = any> {
   success: boolean;
   data?: T;
-  message?: string;
   error?: {
     code: string;
     message: string;
@@ -83,14 +82,6 @@ type ErrorResponse = CommonApiResponse<never> & {
 }
 ```
 
-### 단순 성공 응답
-
-```json
-{
-  "success": true,
-  "message": "ok"
-}
-```
 
 ### 실패 응답
 

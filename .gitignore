@@ -1,0 +1,40 @@
+# -----------------------------
+# Python 일반
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Byte-compiled / optimized
+*.pyc
+
+# Virtual environments (uv는 자동 관리하므로 제외)
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# PyInstaller
+*.spec
+
+# Cython build
+cython_debug/
+
+# -----------------------------
+# uv 관련
+# -----------------------------
+# uv 자체는 캐시 디렉토리를 생성할 수 있음
+.uv
+
+
+CLAUDE.md
+note.md

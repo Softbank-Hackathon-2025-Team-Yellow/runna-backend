@@ -8,7 +8,6 @@
 interface CommonApiResponse<T = any> {
   success: boolean;
   data?: T;
-  message?: string;
   error?: {
     code: string;
     message: string;
@@ -242,7 +241,33 @@ interface CommonApiResponse<T = any> {
 
 ---
 
-## **1.5. GET `/functions/{function_id}/metrics`**
+## **1.5. DELETE `/functions/{function_id}`**
+
+함수 삭제
+
+### **Request**
+
+**Request Type**
+
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| `function_id` | number | No | 함수 고유 ID |
+
+**Example**
+
+```json
+{
+  "function_id": 12345
+}
+```
+
+### **Response**
+
+No response
+
+---
+
+## **1.6. GET `/functions/{function_id}/metrics`**
 
 함수 메트릭 조회
 
