@@ -1,7 +1,7 @@
 [project]
-name = "backend"
+name = "Runna-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Run your code with serverless"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
