@@ -31,30 +31,30 @@ interface CommonApiResponse<T = any> {
 
 함수의 런타임 타입. python과 node.js 지원
 
-| Value | Description |
-| --- | --- |
-| `python` |  |
-| `nodejs` |  |
+| Value    | Description |
+| -------- | ----------- |
+| `python` |             |
+| `nodejs` |             |
 
 ### `ExecutionType`
 
 함수의 실행 타입. sync(동기) 또는 async(비동기) 지원
 
-| Value | Description |
-| --- | --- |
-| **`sync`** | 동기 |
-| **`async`** | 비동기 |
+| Value       | Description |
+| ----------- | ----------- |
+| **`sync`**  | 동기        |
+| **`async`** | 비동기      |
 
 ### `JobStatus`
 
 함수 실행 작업의 상태
 
-| Value | Description |
-| --- | --- |
+| Value     | Description                                            |
+| --------- | ------------------------------------------------------ |
 | `pending` | 실행 대기 중 (async 함수의 최초 요청 시에만 임시 반환) |
-| `running` | 함수 실행 중 |
-| `succeeded` | 실행 성공 |
-| `failed` | 실행 실패 |
+| `running` | 함수 실행 중                                           |
+| `success` | 실행 성공                                              |
+| `failed`  | 실행 실패                                              |
 
 ## Data Types
 
@@ -62,27 +62,28 @@ interface CommonApiResponse<T = any> {
 
 함수 정의 타입
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `id` | number | No | 함수 고유 ID |
-| `name` | string | No | 함수 이름 (고유값) |
-| `runtime` | [`Runtime`](#Runtime)  | No | 실행 환경 (`python`, `nodejs` 등) |
-| `code` | string | No | 함수 코드 |
-| `execution_type` | [`ExecutionType`](#ExecutionType)  | No | 실행 타입 (`sync` 또는 `async`) |
-| `created_at` | string(Datetime) | No | 함수 생성 시간 |
-| `updated_at` | string(Datetime) | No | 함수 수정 시간 |
+| Field            | Type                              | Nullable | Description                       |
+| ---------------- | --------------------------------- | -------- | --------------------------------- |
+| `id`             | number                            | No       | 함수 고유 ID                      |
+| `name`           | string                            | No       | 함수 이름 (고유값)                |
+| `runtime`        | [`Runtime`](#Runtime)             | No       | 실행 환경 (`python`, `nodejs` 등) |
+| `code`           | string                            | No       | 함수 코드                         |
+| `execution_type` | [`ExecutionType`](#ExecutionType) | No       | 실행 타입 (`sync` 또는 `async`)   |
+| `created_at`     | string(Datetime)                  | No       | 함수 생성 시간                    |
+| `updated_at`     | string(Datetime)                  | No       | 함수 수정 시간                    |
 
 ### `Job`
 
 함수 실행 작업 타입. 함수 실행 요청 시 생성되며 실행 결과가 기록됨
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `id` | number | No | 작업 ID |
-| `function_id` | number | No | 실행된 함수의 ID |
-| `status` | [`JobStatus`](#JobStatus)  | No | 작업 실행 상태 |
-| `result`  | Object | Yes | 함수 실행 결과 |
-| `timestamp`  | string(Datetime) | No | 함수 실행 요청 시간 |
+| Field         | Type                      | Nullable | Description         |
+| ------------- | ------------------------- | -------- | ------------------- |
+| `id`          | number                    | No       | 작업 ID             |
+| `function_id` | number                    | No       | 실행된 함수의 ID    |
+| `status`      | [`JobStatus`](#JobStatus) | No       | 작업 실행 상태      |
+| `result`      | Object                    | Yes      | 함수 실행 결과      |
+| `timestamp`   | string(Datetime)          | No       | 함수 실행 요청 시간 |
+| `duration`    | number                    | Yes      | 함수 실행 시간(ms)  |
 
 # 1. **Function Management API**
 
@@ -95,16 +96,16 @@ interface CommonApiResponse<T = any> {
 **Request Type**
 
 | Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| - | - | - |  |
+| ----- | ---- | -------- | ----------- |
+| -     | -    | -        |             |
 
 ### **Response**
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `functions` | Array<[`Function`](#Function) > | No | 함수 목록 |
+| Field       | Type                            | Nullable | Description |
+| ----------- | ------------------------------- | -------- | ----------- |
+| `functions` | Array<[`Function`](#Function) > | No       | 함수 목록   |
 
 **Example**
 
@@ -134,12 +135,12 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `name` | string | No | 함수 이름 |
-| `runtime` | [`Runtime`](#Runtime)  | No | 실행 환경 (`python`, `nodejs` 등) |
-| `code` | string | No | 함수 코드 |
-| `execution_type` | [`ExecutionType`](#ExecutionType)  | No | 실행 타입 (`sync` 또는 `async`) |
+| Field            | Type                              | Nullable | Description                       |
+| ---------------- | --------------------------------- | -------- | --------------------------------- |
+| `name`           | string                            | No       | 함수 이름                         |
+| `runtime`        | [`Runtime`](#Runtime)             | No       | 실행 환경 (`python`, `nodejs` 등) |
+| `code`           | string                            | No       | 함수 코드                         |
+| `execution_type` | [`ExecutionType`](#ExecutionType) | No       | 실행 타입 (`sync` 또는 `async`)   |
 
 **Example**
 
@@ -156,9 +157,9 @@ interface CommonApiResponse<T = any> {
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -178,12 +179,12 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `name` | string | Yes | 함수 이름 |
-| `runtime` | [`Runtime`](#Runtime)  | Yes | 실행 환경 (`python`, `nodejs` 등) |
-| `code` | string | Yes | 함수 코드 |
-| `execution_type` | [`ExecutionType`](#ExecutionType)  | Yes | 실행 타입 (`sync` 또는 `async`) |
+| Field            | Type                              | Nullable | Description                       |
+| ---------------- | --------------------------------- | -------- | --------------------------------- |
+| `name`           | string                            | Yes      | 함수 이름                         |
+| `runtime`        | [`Runtime`](#Runtime)             | Yes      | 실행 환경 (`python`, `nodejs` 등) |
+| `code`           | string                            | Yes      | 함수 코드                         |
+| `execution_type` | [`ExecutionType`](#ExecutionType) | Yes      | 실행 타입 (`sync` 또는 `async`)   |
 
 **Example**
 
@@ -200,9 +201,9 @@ interface CommonApiResponse<T = any> {
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -222,9 +223,9 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -264,9 +265,9 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -290,9 +291,9 @@ No response
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -306,13 +307,13 @@ No response
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `invocations` | object | No | 호출 관련 메트릭 (총 호출 횟수 등) |
-| `success_rate` | number | No | 함수 성공률 |
-| `avg_execution_time` | string | No | 평균 실행 시간 |
-| `cpu_usage` | string | No | 함수의 CPU 사용량 |
-| `memory_usage` | string | No | 함수의 메모리 사용량 |
+| Field                | Type   | Nullable | Description                        |
+| -------------------- | ------ | -------- | ---------------------------------- |
+| `invocations`        | object | No       | 호출 관련 메트릭 (총 호출 횟수 등) |
+| `success_rate`       | number | No       | 함수 성공률                        |
+| `avg_execution_time` | string | No       | 평균 실행 시간                     |
+| `cpu_usage`          | string | No       | 함수의 CPU 사용량                  |
+| `memory_usage`       | string | No       | 함수의 메모리 사용량               |
 
 **Example**
 
@@ -342,10 +343,10 @@ No response
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `param1` | string | Yes | 함수에 전달할 첫 번째 파라미터 |
-| `param2` | string | Yes | 함수에 전달할 두 번째 파라미터 |
+| Field    | Type   | Nullable | Description                    |
+| -------- | ------ | -------- | ------------------------------ |
+| `param1` | string | Yes      | 함수에 전달할 첫 번째 파라미터 |
+| `param2` | string | Yes      | 함수에 전달할 두 번째 파라미터 |
 
 **Example**
 
@@ -370,7 +371,8 @@ No response
   "function_id": 67890,
   "status": "pending",
   "result": null,
-  "timestamp": "2023-10-30T10:00:00Z"
+  "timestamp": "2023-10-30T10:00:00Z",
+  "duration": 452
 }
 ```
 
@@ -386,9 +388,9 @@ No response
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `id` | number | No | 비동기 작업 ID |
+| Field | Type   | Nullable | Description    |
+| ----- | ------ | -------- | -------------- |
+| `id`  | number | No       | 비동기 작업 ID |
 
 **Example**
 
@@ -410,11 +412,12 @@ No response
 {
   "id": 12345,
   "function_id": 67890,
-  "status": "succeeded",
+  "status": "success",
   "result": {
     "data": "function result"
   },
-  "timestamp": "2023-10-30T10:00:00Z"
+  "timestamp": "2023-10-30T10:00:00Z",
+  "duration": 421
 }
 ```
 
@@ -426,9 +429,9 @@ No response
 
 **Request Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | number | No | 함수 고유 ID |
+| Field         | Type   | Nullable | Description  |
+| ------------- | ------ | -------- | ------------ |
+| `function_id` | number | No       | 함수 고유 ID |
 
 **Example**
 
@@ -442,9 +445,9 @@ No response
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `jobs`  | Array<[`Job`](#Job) > | No | 작업 리스트 |
+| Field  | Type                  | Nullable | Description |
+| ------ | --------------------- | -------- | ----------- |
+| `jobs` | Array<[`Job`](#Job) > | No       | 작업 리스트 |
 
 **Example**
 
@@ -454,18 +457,20 @@ No response
     {
       "id": 12345,
       "function_id": 1,
-      "status": "succeeded",
+      "status": "success",
       "timestamp": "2023-10-30T10:00:00Z",
       "result": {
         "data": "function result"
-      }
+      },
+      "duration": 452
     },
     {
       "id": 67890,
       "function_id": 1,
       "status": "failed",
       "timestamp": "2023-10-30T11:00:00Z",
-      "result": null
+      "result": null,
+      "duration": 452
     }
   ]
 }

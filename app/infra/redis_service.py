@@ -63,7 +63,6 @@ class RedisService:
             redis_key = self._build_key(namespace, key)
             serialized_value = self._serialize(value)
             self.client.lpush(redis_key, serialized_value)
-            self.client.xadd(redis_key, serialized_value)
             return True
         except redis.ConnectionError:
             return False

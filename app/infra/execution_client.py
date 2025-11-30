@@ -37,4 +37,5 @@ class ExecutionClient:
             redis_service.lpush(self.exec_q_name, self.key, exec_msg)
 
         except Exception as e:
+            print(e)
             print(f"Execution Request Push Failed. (job: {job.id})")

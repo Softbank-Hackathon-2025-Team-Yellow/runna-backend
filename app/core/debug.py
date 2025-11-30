@@ -1,13 +1,23 @@
 from app.config import settings
+import functools
 
 
 class Debug:
     def __init__(self, f):
-        self._f = f
+        self.func = f
+        functools.update_wrapper(self, f)
+
+    def __get__(self, obj, objtype=None):
+        """Support instance methods."""
+        if obj is None:
+            return self
+        return functools.partial(self.__call__, obj)
 
     def __call__(self, *args, **kwargs):
         if settings.debug:
             print(
-                f"DEBUG: {self._f.__name__}() called w/ args: {args}, kwargs: {kwargs}"
+                f"DEBUG: {self.func.__name__}() called w/ args: {args}, kwargs: {kwargs}"
             )
-        return _f(*args, **kwargs)
+
+        result = self.func(*args, **kwargs)
+        return result

@@ -32,7 +32,7 @@ def test_invoke_sync_function_success(client: TestClient):
 
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["status"] == "succeeded"
+        assert data["data"]["status"] == "success"
         assert data["data"]["result"]["result"] == "test_value"
         assert "id" in data["data"]
         assert data["data"]["function_id"] == function_id
@@ -134,7 +134,7 @@ def test_get_function_jobs(client: TestClient):
     assert data["success"] is True
     assert len(data["data"]["jobs"]) == 1
     assert data["data"]["jobs"][0]["function_id"] == function_id
-    assert data["data"]["jobs"][0]["status"] == "succeeded"
+    assert data["data"]["jobs"][0]["status"] == "success"
 
 
 def test_get_function_metrics(client: TestClient):

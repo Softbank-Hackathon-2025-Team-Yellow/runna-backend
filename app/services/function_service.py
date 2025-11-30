@@ -86,7 +86,7 @@ class FunctionService:
 
         successful_jobs = (
             self.db.query(Job)
-            .filter(Job.function_id == function_id, Job.status == JobStatus.SUCCEEDED)
+            .filter(Job.function_id == function_id, Job.status == JobStatus.SUCCESS)
             .count()
         )
 
