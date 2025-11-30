@@ -1,6 +1,7 @@
 import os
 import secrets
-from pydantic import BaseSettings, validator
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 from typing import Optional
 
 
@@ -21,7 +22,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     
-    @validator('secret_key', pre=True)
+    @field_validator('secret_key', mode='before')
+    @classmethod
     def generate_secret_key(cls, v):
         if v is None or v == "":
             # 프로덕션에서는 반드시 환경변수로 설정해야 함
@@ -31,7 +33,8 @@ class Settings(BaseSettings):
             return secrets.token_urlsafe(32)
         return v
     
-    @validator('database_url')
+    @field_validator('database_url')
+    @classmethod
     def validate_database_url(cls, v):
         if v.startswith('postgresql://user:password@'):
             print("⚠️  경고: 기본 데이터베이스 설정을 사용 중입니다. .env 파일을 설정하세요.")

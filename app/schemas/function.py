@@ -27,7 +27,7 @@ class FunctionResponse(FunctionBase):
     function_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @classmethod
     def from_orm(cls, obj):
