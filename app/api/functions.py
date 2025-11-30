@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -80,17 +79,15 @@ def delete_function(function_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{function_id}/invoke")
-def invoke_function(
-    function_id: int, request: InvokeFunctionRequest, db: Session = Depends(get_db)
-):
+def invoke_function(function_id: int, request: dict, db: Session = Depends(get_db)):
     try:
         service = ExecutionService(db)
-        result = service.execute_function(function_id, request.to_dict())
+        result = service.execute_function(function_id, request)
         return create_success_response(result)
     except ValueError as e:
         return create_error_response("FUNCTION_NOT_FOUND", str(e))
-    except Exception:
-        return create_error_response("EXECUTION_ERROR", "Function execution failed")
+    except Exception as e:
+        return create_error_response("EXECUTION_ERROR", str(e))
 
 
 @router.get("/{function_id}/jobs")

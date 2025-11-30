@@ -108,3 +108,114 @@ class RedisService:
             return [key.replace(f"{self.key_prefix}:", "") for key in keys]
         except redis.ConnectionError:
             return []
+
+    def xadd(
+        self, stream: str, fields: Dict[str, Any], maxlen: Optional[int] = None
+    ) -> Optional[str]:
+        try:
+            stream_key = self._build_key("stream", stream)
+            print(stream_key)
+            serialized_fields = {}
+            for key, value in fields.items():
+                if isinstance(value, (dict, list)):
+                    serialized_fields[key] = self._serialize(value)
+                else:
+                    serialized_fields[key] = str(value)
+
+            kwargs = {}
+            if maxlen is not None:
+                kwargs["maxlen"] = maxlen
+                kwargs["approximate"] = True
+
+            return self.client.xadd(stream_key, serialized_fields, **kwargs)
+        except redis.ConnectionError:
+            return None
+
+    def xgroup_create(
+        self, stream: str, group_name: str, id: str = "0", mkstream: bool = True
+    ) -> bool:
+        try:
+            stream_key = self._build_key("stream", stream)
+            self.client.xgroup_create(stream_key, group_name, id=id, mkstream=mkstream)
+            return True
+        except redis.ResponseError as e:
+            if "BUSYGROUP" in str(e):
+                return True
+            return False
+        except redis.ConnectionError:
+            return False
+
+    def xreadgroup(
+        self,
+        group_name: str,
+        consumer_name: str,
+        streams: Dict[str, str],
+        count: Optional[int] = None,
+        block: Optional[int] = None,
+    ) -> List:
+        try:
+            stream_keys = {
+                self._build_key("stream", stream): stream_id
+                for stream, stream_id in streams.items()
+            }
+
+            kwargs = {}
+            if count is not None:
+                kwargs["count"] = count
+            if block is not None:
+                kwargs["block"] = block
+
+            result = self.client.xreadgroup(
+                group_name, consumer_name, stream_keys, **kwargs
+            )
+
+            processed_result = []
+            for stream_key, messages in result:
+                original_stream = stream_key.replace(f"{self.key_prefix}:stream:", "")
+                processed_messages = []
+                for msg_id, fields in messages:
+                    processed_fields = {}
+                    for key, value in fields.items():
+                        try:
+                            processed_fields[key] = self._deserialize(value)
+                        except json.JSONDecodeError:
+                            processed_fields[key] = value
+                    processed_messages.append((msg_id, processed_fields))
+                processed_result.append((original_stream, processed_messages))
+
+            return processed_result
+        except redis.ConnectionError:
+            return []
+
+    def xack(
+        self, stream: str, group_name: str, message_ids: Union[str, List[str]]
+    ) -> int:
+        try:
+            stream_key = self._build_key("stream", stream)
+            if isinstance(message_ids, str):
+                message_ids = [message_ids]
+            return self.client.xack(stream_key, group_name, *message_ids)
+        except redis.ConnectionError:
+            return 0
+
+    def publish(self, channel: str, message: Any) -> int:
+        try:
+            channel_key = self._build_key("channel", channel)
+            serialized_message = self._serialize(message)
+            return self.client.publish(channel_key, serialized_message)
+        except redis.ConnectionError:
+            return 0
+
+    def get_pubsub(self):
+        try:
+            return self.client.pubsub()
+        except redis.ConnectionError:
+            return None
+
+    def subscribe_channel(self, pubsub, channel: str) -> bool:
+        try:
+            channel_key = self._build_key("channel", channel)
+            pubsub.subscribe(channel_key)
+            return True
+        except redis.ConnectionError:
+            return False

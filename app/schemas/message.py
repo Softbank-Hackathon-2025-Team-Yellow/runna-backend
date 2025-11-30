@@ -23,4 +23,3 @@ class Callback(BaseModel):
     job_id: int
     status: ExecutionStatus
     result: Optional[str]
-    error: Optional[str]

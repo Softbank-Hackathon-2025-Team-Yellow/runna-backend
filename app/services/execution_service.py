@@ -12,7 +12,7 @@ from app.core.debug import Debug
 class ExecutionService:
     def __init__(self, db: Session):
         self.db = db
-        self.exec_service = ExecutionClient()
+        self.exec_client = ExecutionClient()
 
     # @Debug
     def execute_function(self, function_id: int, input_data: Dict[str, Any]) -> Job:
@@ -39,10 +39,10 @@ class ExecutionService:
 
     # @Debug
     def _execute_sync(self, job: Job, input_data: Dict[str, Any]) -> Job:
-        self.exec_service.insert_exec_queue(job, input_data)
+        self.exec_client.insert_exec_queue(job, input_data)
         return job
 
     # @Debug
     def _execute_async(self, job: Job, input_data: Dict[str, Any]) -> Job:
-        self.exec_service.insert_exec_queue(job, input_data)
+        self.exec_client.insert_exec_queue(job, input_data)
         return job
