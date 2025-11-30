@@ -16,10 +16,10 @@ class JobStatus(str, enum.Enum):
 class Job(Base):
     __tablename__ = "jobs"
 
-    job_id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    function_id = Column(Integer, ForeignKey("functions.id"), nullable=False)
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     result = Column(Text, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     
-    execution = relationship("Execution", back_populates="jobs")
+    function = relationship("Function", back_populates="jobs")

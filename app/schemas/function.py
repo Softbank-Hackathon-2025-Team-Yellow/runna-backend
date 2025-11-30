@@ -24,20 +24,12 @@ class FunctionUpdate(BaseModel):
 
 
 class FunctionResponse(FunctionBase):
-    function_id: int
+    id: int
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
-
-    @classmethod
-    def from_orm(cls, obj):
-        return cls(
-            name=obj.name,
-            runtime=obj.runtime,
-            code=obj.code,
-            execution_type=obj.execution_type,
-            function_id=obj.id
-        )
 
 
 class CommonApiResponse(BaseModel):
@@ -48,3 +40,12 @@ class CommonApiResponse(BaseModel):
 
 class FunctionCreateResponse(BaseModel):
     function_id: int
+
+
+class InvokeFunctionRequest(BaseModel):
+    param1: Optional[str] = None
+    param2: Optional[str] = None
+    
+    def to_dict(self) -> dict:
+        """Convert request to dictionary for function execution"""
+        return {k: v for k, v in self.model_dump().items() if v is not None}

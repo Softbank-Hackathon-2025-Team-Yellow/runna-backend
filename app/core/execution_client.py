@@ -7,7 +7,7 @@ import uuid
 from app.config import settings
 
 
-class KNativeClient:
+class ExecutionClient:
     def __init__(self):
         self.base_url = settings.knative_url
         self.timeout = settings.knative_timeout

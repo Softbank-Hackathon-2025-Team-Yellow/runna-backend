@@ -47,36 +47,40 @@ interface CommonApiResponse<T = any> {
 
 ### `JobStatus`
 
-함수의 실행 상태
+함수 실행 작업의 상태
 
 | Value | Description |
 | --- | --- |
-| `pending` | (async) 최초 실행 요청 시 |
-| `running` | (async) 실행 중 |
-| `succeeded` | 실행 완료 |
+| `pending` | 실행 대기 중 (async 함수의 최초 요청 시에만 임시 반환) |
+| `running` | 함수 실행 중 |
+| `succeeded` | 실행 성공 |
 | `failed` | 실행 실패 |
 
 ## Data Types
 
 ### `Function`
 
-함수 타입
+함수 정의 타입
 
 | Field | Type | Nullable | Description |
 | --- | --- | --- | --- |
-| `name` | string | No | 함수 이름 |
+| `id` | number | No | 함수 고유 ID |
+| `name` | string | No | 함수 이름 (고유값) |
 | `runtime` | [`Runtime`](#Runtime)  | No | 실행 환경 (`python`, `nodejs` 등) |
 | `code` | string | No | 함수 코드 |
 | `execution_type` | [`ExecutionType`](#ExecutionType)  | No | 실행 타입 (`sync` 또는 `async`) |
+| `created_at` | string(Datetime) | No | 함수 생성 시간 |
+| `updated_at` | string(Datetime) | No | 함수 수정 시간 |
 
 ### `Job`
 
-함수 실행 데이터 타입
+함수 실행 작업 타입. 함수 실행 요청 시 생성되며 실행 결과가 기록됨
 
 | Field | Type | Nullable | Description |
 | --- | --- | --- | --- |
-| `job_id` | number | No | 작업 ID |
-| `status` | [`JobStatus`](#JobStatus)  | No |  |
+| `id` | number | No | 작업 ID |
+| `function_id` | number | No | 실행된 함수의 ID |
+| `status` | [`JobStatus`](#JobStatus)  | No | 작업 실행 상태 |
 | `result`  | Object | Yes | 함수 실행 결과 |
 | `timestamp`  | string(Datetime) | No | 함수 실행 요청 시간 |
 
@@ -108,12 +112,14 @@ interface CommonApiResponse<T = any> {
 {
   "functions": [
     {
-		  "name": "myFunction",
-		  "runtime": "python",
-		  "code": "def handler(event): return event",
-		  "execution_type": "sync",
-		},
-    ...
+      "id": 1,
+      "name": "myFunction",
+      "runtime": "python",
+      "code": "def handler(event): return event",
+      "execution_type": "sync",
+      "created_at": "2023-10-30T10:00:00Z",
+      "updated_at": "2023-10-30T10:00:00Z"
+    }
   ]
 }
 ```
@@ -128,7 +134,12 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-[`Function`](#Function) 
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| `name` | string | No | 함수 이름 |
+| `runtime` | [`Runtime`](#Runtime)  | No | 실행 환경 (`python`, `nodejs` 등) |
+| `code` | string | No | 함수 코드 |
+| `execution_type` | [`ExecutionType`](#ExecutionType)  | No | 실행 타입 (`sync` 또는 `async`) |
 
 **Example**
 
@@ -137,7 +148,7 @@ interface CommonApiResponse<T = any> {
   "name": "myFunction",
   "runtime": "python",
   "code": "def handler(event): return event",
-  "execution_type": "sync",
+  "execution_type": "sync"
 }
 ```
 
@@ -167,7 +178,12 @@ interface CommonApiResponse<T = any> {
 
 **Request Type**
 
-[`Function`](#Function) 
+| Field | Type | Nullable | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | 함수 이름 |
+| `runtime` | [`Runtime`](#Runtime)  | Yes | 실행 환경 (`python`, `nodejs` 등) |
+| `code` | string | Yes | 함수 코드 |
+| `execution_type` | [`ExecutionType`](#ExecutionType)  | Yes | 실행 타입 (`sync` 또는 `async`) |
 
 **Example**
 
@@ -222,20 +238,19 @@ interface CommonApiResponse<T = any> {
 
 **Response Type**
 
-| Field | Type | Nullable | Description |
-| --- | --- | --- | --- |
-| `function_id` | string | No | 함수 고유 ID |
-| …`function` | [`Function`](#Function)  |  |  |
+[`Function`](#Function)
 
 **Example**
 
 ```json
 {
-  "function_id": "12345",
+  "id": 12345,
   "name": "myFunction",
   "runtime": "python",
   "code": "def handler(event): return event",
   "execution_type": "sync",
+  "created_at": "2023-10-30T10:00:00Z",
+  "updated_at": "2023-10-30T10:00:00Z"
 }
 ```
 
@@ -321,7 +336,7 @@ No response
 
 ## **2.1. POST `/functions/{function_id}/invoke`**
 
-함수 실행 (job_id 반환)
+함수 실행 (id 반환)
 
 ### **Request**
 
@@ -351,10 +366,11 @@ No response
 
 ```json
 {
-  "job_id": 12345,
-  "status": "accepted",
-  "result": Any(string, json, number, etc.)
-	"timestamp": "2023-10-30T10:00:00Z",
+  "id": 12345,
+  "function_id": 67890,
+  "status": "pending",
+  "result": null,
+  "timestamp": "2023-10-30T10:00:00Z"
 }
 ```
 
@@ -362,7 +378,7 @@ No response
 
 # 3. **Jobs (Executions) API**
 
-## **3.1. GET `/jobs/{job_id}`**
+## **3.1. GET `/jobs/{id}`**
 
 실행 결과 조회
 
@@ -372,13 +388,13 @@ No response
 
 | Field | Type | Nullable | Description |
 | --- | --- | --- | --- |
-| `job_id` | number | No | 비동기 작업 ID |
+| `id` | number | No | 비동기 작업 ID |
 
 **Example**
 
 ```json
 {
-  "job_id": 12345
+  "id": 12345
 }
 ```
 
@@ -392,12 +408,13 @@ No response
 
 ```json
 {
-  "job_id": 12345,
+  "id": 12345,
+  "function_id": 67890,
   "status": "succeeded",
   "result": {
     "data": "function result"
   },
-	"timestamp": "2023-10-30T10:00:00Z",
+  "timestamp": "2023-10-30T10:00:00Z"
 }
 ```
 
@@ -435,7 +452,8 @@ No response
 {
   "jobs": [
     {
-      "job_id": "12345",
+      "id": 12345,
+      "function_id": 1,
       "status": "succeeded",
       "timestamp": "2023-10-30T10:00:00Z",
       "result": {
@@ -443,12 +461,12 @@ No response
       }
     },
     {
-      "job_id": "67890",
+      "id": 67890,
+      "function_id": 1,
       "status": "failed",
       "timestamp": "2023-10-30T11:00:00Z",
       "result": null
     }
   ]
 }
-
 ```

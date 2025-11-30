@@ -3,7 +3,6 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy import func
 
 from app.models.function import Function
-from app.models.execution import Execution
 from app.models.job import Job, JobStatus
 from app.schemas.function import FunctionCreate, FunctionUpdate
 from app.core.static_analysis import analyzer
@@ -32,7 +31,7 @@ class FunctionService:
         return self.db.query(Function).filter(Function.name == name).first()
 
     def list_functions(self, skip: int = 0, limit: int = 100) -> List[Function]:
-        return self.db.query(Function).filter(Function.is_active == True).offset(skip).limit(limit).all()
+        return self.db.query(Function).offset(skip).limit(limit).all()
 
     def update_function(self, function_id: int, function_update: FunctionUpdate) -> Optional[Function]:
         db_function = self.get_function(function_id)
@@ -60,7 +59,9 @@ class FunctionService:
         if not db_function:
             return False
 
-        db_function.is_active = False
+        # Delete the function and related jobs
+        self.db.query(Job).filter(Job.function_id == function_id).delete()
+        self.db.delete(db_function)
         self.db.commit()
         return True
 
@@ -69,32 +70,33 @@ class FunctionService:
         if not function:
             return None
 
-        total_executions = self.db.query(Execution).filter(
-            Execution.function_id == function_id
+        # Get metrics directly from Job table
+        total_jobs = self.db.query(Job).filter(
+            Job.function_id == function_id
         ).count()
 
-        successful_executions = self.db.query(Job).join(Execution).filter(
-            Execution.function_id == function_id,
+        successful_jobs = self.db.query(Job).filter(
+            Job.function_id == function_id,
             Job.status == JobStatus.SUCCEEDED
         ).count()
 
-        failed_executions = self.db.query(Job).join(Execution).filter(
-            Execution.function_id == function_id,
+        failed_jobs = self.db.query(Job).filter(
+            Job.function_id == function_id,
             Job.status == JobStatus.FAILED
         ).count()
 
-        success_rate = (successful_executions / total_executions * 100) if total_executions > 0 else 0
+        success_rate = (successful_jobs / total_jobs * 100) if total_jobs > 0 else 0
 
         return {
             "invocations": {
-                "total": total_executions,
-                "successful": successful_executions,
-                "failed": failed_executions
+                "total": total_jobs,
+                "successful": successful_jobs,
+                "failed": failed_jobs
             },
             "success_rate": round(success_rate, 2),
-            "avg_execution_time": "120ms",
-            "cpu_usage": "70%",
-            "memory_usage": "256MB"
+            "avg_execution_time": "120ms",  # TODO: Calculate from actual data
+            "cpu_usage": "70%",  # TODO: Get from monitoring system
+            "memory_usage": "256MB"  # TODO: Get from monitoring system
         }
 
     def _analyze_code(self, code: str, runtime: str) -> dict:

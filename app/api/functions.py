@@ -3,8 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.schemas.function import FunctionCreate, FunctionUpdate, FunctionResponse, FunctionCreateResponse, CommonApiResponse
-from app.schemas.execution import InvokeFunctionRequest
+from app.schemas.function import FunctionCreate, FunctionUpdate, FunctionResponse, FunctionCreateResponse, CommonApiResponse, InvokeFunctionRequest
 from app.schemas.job import JobResponse
 from app.services.function_service import FunctionService
 from app.services.execution_service import ExecutionService
@@ -17,7 +16,7 @@ router = APIRouter()
 def get_functions(db: Session = Depends(get_db)):
     service = FunctionService(db)
     functions = service.list_functions()
-    function_responses = [FunctionResponse.from_orm(f) for f in functions]
+    function_responses = [FunctionResponse.model_validate(f) for f in functions]
     return create_success_response({"functions": function_responses})
 
 
@@ -64,8 +63,8 @@ def get_function(
     if not function:
         return create_error_response("FUNCTION_NOT_FOUND", f"Function with id {function_id} not found")
     
-    response_data = FunctionResponse.from_orm(function)
-    return create_success_response(response_data.dict())
+    response_data = FunctionResponse.model_validate(function)
+    return create_success_response(response_data.model_dump())
 
 
 @router.delete("/{function_id}")

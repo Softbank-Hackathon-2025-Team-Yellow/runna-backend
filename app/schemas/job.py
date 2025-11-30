@@ -6,7 +6,8 @@ from app.models.job import JobStatus
 
 
 class JobResponse(BaseModel):
-    job_id: int
+    id: int
+    function_id: int
     status: JobStatus
     result: Optional[Any] = None
     timestamp: datetime

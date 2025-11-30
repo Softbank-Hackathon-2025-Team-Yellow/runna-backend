@@ -15,7 +15,6 @@ from app.config import settings
 
 # Import all models to ensure they are registered with Base.metadata
 from app.models.function import Function
-from app.models.execution import Execution  
 from app.models.job import Job
 
 # this is the Alembic Config object, which provides
