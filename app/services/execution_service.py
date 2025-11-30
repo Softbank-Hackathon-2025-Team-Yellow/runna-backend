@@ -1,14 +1,11 @@
-from sqlalchemy.orm import Session
-from typing import List, Optional, Union, Dict, Any
-import json
-from datetime import datetime
-import uuid
+from typing import Any, Dict
 
-from app.models.function import Function, ExecutionType
+from sqlalchemy.orm import Session
+
+from app.infra.execution_client import ExecutionClient
+from app.models.function import ExecutionType, Function
 from app.models.job import Job, JobStatus
 from app.schemas.job import JobCreate
-from app.core.knative_client import knative_client
-from app.infra.execution_client import ExecutionClient
 
 
 class ExecutionService:
@@ -21,7 +18,7 @@ class ExecutionService:
         function = self.db.query(Function).filter(Function.id == function_id).first()
         if not function:
             raise ValueError("Function not found")
-        
+
         _job = JobCreate(function_id=function.id, status=JobStatus.PENDING)
 
         job = Job(**_job.model_dump())
@@ -38,9 +35,7 @@ class ExecutionService:
     def _execute_sync(self, job: Job, input_data: Dict[str, Any]) -> Dict[str, Any]:
         ExecutionClient.insert_exec_queue(job, input_data)
         return job
-    
 
     def _execute_async(self, job: Job, input_data: Dict[str, Any]) -> Dict[str, Any]:
         ExecutionClient.insert_exec_queue(job, input_data)
         return job
-    

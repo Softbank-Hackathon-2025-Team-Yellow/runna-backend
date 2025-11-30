@@ -1,8 +1,9 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
-from app.models.function import Runtime, ExecutionType
+from pydantic import BaseModel
+
+from app.models.function import ExecutionType, Runtime
 
 
 class FunctionBase(BaseModel):
@@ -45,7 +46,7 @@ class FunctionCreateResponse(BaseModel):
 class InvokeFunctionRequest(BaseModel):
     param1: Optional[str] = None
     param2: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         """Convert request to dictionary for function execution"""
         return {k: v for k, v in self.model_dump().items() if v is not None}

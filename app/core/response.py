@@ -1,4 +1,4 @@
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
 
 
 def create_success_response(data: Optional[Any] = None) -> Dict[str, Any]:
@@ -9,13 +9,12 @@ def create_success_response(data: Optional[Any] = None) -> Dict[str, Any]:
     return response
 
 
-def create_error_response(code: str, message: str, details: Optional[Any] = None) -> Dict[str, Any]:
+def create_error_response(
+    code: str, message: str, details: Optional[Any] = None
+) -> Dict[str, Any]:
     """Create a standardized error response following CommonApiResponse format"""
     error = {"code": code, "message": message}
     if details is not None:
         error["details"] = details
-    
-    return {
-        "success": False,
-        "error": error
-    }
+
+    return {"success": False, "error": error}

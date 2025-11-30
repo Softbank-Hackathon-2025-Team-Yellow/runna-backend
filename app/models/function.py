@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum
+import enum
+
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import enum
 
 from app.database import Base
 
@@ -25,6 +26,8 @@ class Function(Base):
     code = Column(Text, nullable=False)
     execution_type = Column(Enum(ExecutionType), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
     jobs = relationship("Job", back_populates="function")

@@ -1,7 +1,15 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey
+import enum
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-import enum
 
 from app.database import Base
 
@@ -21,5 +29,5 @@ class Job(Base):
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     result = Column(Text, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     function = relationship("Function", back_populates="jobs")

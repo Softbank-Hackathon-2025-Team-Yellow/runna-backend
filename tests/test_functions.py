@@ -1,7 +1,4 @@
-import pytest
 from fastapi.testclient import TestClient
-
-from app.models.function import Runtime, ExecutionType
 
 
 def test_create_function(client: TestClient):
@@ -9,12 +6,12 @@ def test_create_function(client: TestClient):
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return {'result': 'success'}",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     response = client.post("/functions/", json=function_data)
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
     assert "function_id" in data["data"]
@@ -23,7 +20,7 @@ def test_create_function(client: TestClient):
 def test_get_functions_empty(client: TestClient):
     response = client.get("/functions/")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
     assert data["data"]["functions"] == []
@@ -35,16 +32,16 @@ def test_get_functions_with_data(client: TestClient):
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     create_response = client.post("/functions/", json=function_data)
     assert create_response.status_code == 200
-    
+
     # Get functions
     response = client.get("/functions/")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
     assert len(data["data"]["functions"]) == 1
@@ -57,16 +54,16 @@ def test_get_function_by_id(client: TestClient):
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
-    
+
     # Get function by ID
     response = client.get(f"/functions/{function_id}")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
     assert data["data"]["name"] == "test_function"
@@ -76,7 +73,7 @@ def test_get_function_by_id(client: TestClient):
 def test_get_nonexistent_function(client: TestClient):
     response = client.get("/functions/999")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is False
     assert "FUNCTION_NOT_FOUND" in data["error"]["code"]
@@ -88,21 +85,21 @@ def test_update_function(client: TestClient):
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
-    
+
     # Update function
     update_data = {
         "name": "updated_function",
-        "code": "def handler(event): return {'updated': True}"
+        "code": "def handler(event): return {'updated': True}",
     }
-    
+
     response = client.put(f"/functions/{function_id}", json=update_data)
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
     assert data["data"]["function_id"] == function_id
@@ -114,19 +111,19 @@ def test_delete_function(client: TestClient):
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
-    
+
     # Delete function
     response = client.delete(f"/functions/{function_id}")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is True
-    
+
     # Verify function is deleted
     get_response = client.get(f"/functions/{function_id}")
     assert get_response.json()["success"] is False
@@ -137,12 +134,12 @@ def test_create_function_with_invalid_code(client: TestClient):
         "name": "malicious_function",
         "runtime": "python",
         "code": "import os; os.system('rm -rf /')",
-        "execution_type": "sync"
+        "execution_type": "sync",
     }
-    
+
     response = client.post("/functions/", json=function_data)
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["success"] is False
     assert "VALIDATION_ERROR" in data["error"]["code"]
