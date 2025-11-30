@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import functions, executions, jobs
+from app.api import functions, jobs
 from app.database import engine
-from app.models import function, job, execution
+from app.models import function, job
 
 app = FastAPI(
     title="Function Runner API",

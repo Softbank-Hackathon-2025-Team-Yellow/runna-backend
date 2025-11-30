@@ -18,7 +18,7 @@ class FunctionService:
         if not analysis_result["is_safe"]:
             raise ValueError(f"Code analysis failed: {', '.join(analysis_result['violations'])}")
 
-        db_function = Function(**function_data.dict())
+        db_function = Function(**function_data.model_dump())
         self.db.add(db_function)
         self.db.commit()
         self.db.refresh(db_function)
@@ -38,7 +38,7 @@ class FunctionService:
         if not db_function:
             return None
 
-        update_data = function_update.dict(exclude_unset=True)
+        update_data = function_update.model_dump(exclude_unset=True)
         
         if "code" in update_data:
             runtime = update_data.get("runtime", db_function.runtime)
