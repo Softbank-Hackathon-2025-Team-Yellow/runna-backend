@@ -1,10 +1,9 @@
-from typing import Union, Dict, Any
+from typing import Any, Dict
 
 from app.models.job import Job
 
 
 class ExecutionClient:
-
     async def insert_exec_queue(job: Job, payload: Dict[str, Any]):
         """
         비동기로 실행 큐에 요청을 삽입합니다

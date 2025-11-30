@@ -1,11 +1,11 @@
-from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
-from sqlalchemy import func
+from typing import Any, Dict, List, Optional
 
+from sqlalchemy.orm import Session
+
+from app.core.static_analysis import analyzer
 from app.models.function import Function
 from app.models.job import Job, JobStatus
 from app.schemas.function import FunctionCreate, FunctionUpdate
-from app.core.static_analysis import analyzer
 
 
 class FunctionService:
@@ -13,10 +13,14 @@ class FunctionService:
         self.db = db
 
     def create_function(self, function_data: FunctionCreate) -> Function:
-        analysis_result = self._analyze_code(function_data.code, function_data.runtime.value)
-        
+        analysis_result = self._analyze_code(
+            function_data.code, function_data.runtime.value
+        )
+
         if not analysis_result["is_safe"]:
-            raise ValueError(f"Code analysis failed: {', '.join(analysis_result['violations'])}")
+            raise ValueError(
+                f"Code analysis failed: {', '.join(analysis_result['violations'])}"
+            )
 
         db_function = Function(**function_data.model_dump())
         self.db.add(db_function)
@@ -33,19 +37,26 @@ class FunctionService:
     def list_functions(self, skip: int = 0, limit: int = 100) -> List[Function]:
         return self.db.query(Function).offset(skip).limit(limit).all()
 
-    def update_function(self, function_id: int, function_update: FunctionUpdate) -> Optional[Function]:
+    def update_function(
+        self, function_id: int, function_update: FunctionUpdate
+    ) -> Optional[Function]:
         db_function = self.get_function(function_id)
         if not db_function:
             return None
 
         update_data = function_update.model_dump(exclude_unset=True)
-        
+
         if "code" in update_data:
             runtime = update_data.get("runtime", db_function.runtime)
-            analysis_result = self._analyze_code(update_data["code"], runtime.value if hasattr(runtime, 'value') else runtime)
-            
+            analysis_result = self._analyze_code(
+                update_data["code"],
+                runtime.value if hasattr(runtime, "value") else runtime,
+            )
+
             if not analysis_result["is_safe"]:
-                raise ValueError(f"Code analysis failed: {', '.join(analysis_result['violations'])}")
+                raise ValueError(
+                    f"Code analysis failed: {', '.join(analysis_result['violations'])}"
+                )
 
         for field, value in update_data.items():
             setattr(db_function, field, value)
@@ -71,19 +82,19 @@ class FunctionService:
             return None
 
         # Get metrics directly from Job table
-        total_jobs = self.db.query(Job).filter(
-            Job.function_id == function_id
-        ).count()
+        total_jobs = self.db.query(Job).filter(Job.function_id == function_id).count()
 
-        successful_jobs = self.db.query(Job).filter(
-            Job.function_id == function_id,
-            Job.status == JobStatus.SUCCEEDED
-        ).count()
+        successful_jobs = (
+            self.db.query(Job)
+            .filter(Job.function_id == function_id, Job.status == JobStatus.SUCCEEDED)
+            .count()
+        )
 
-        failed_jobs = self.db.query(Job).filter(
-            Job.function_id == function_id,
-            Job.status == JobStatus.FAILED
-        ).count()
+        failed_jobs = (
+            self.db.query(Job)
+            .filter(Job.function_id == function_id, Job.status == JobStatus.FAILED)
+            .count()
+        )
 
         success_rate = (successful_jobs / total_jobs * 100) if total_jobs > 0 else 0
 
@@ -91,12 +102,12 @@ class FunctionService:
             "invocations": {
                 "total": total_jobs,
                 "successful": successful_jobs,
-                "failed": failed_jobs
+                "failed": failed_jobs,
             },
             "success_rate": round(success_rate, 2),
             "avg_execution_time": "120ms",  # TODO: Calculate from actual data
             "cpu_usage": "70%",  # TODO: Get from monitoring system
-            "memory_usage": "256MB"  # TODO: Get from monitoring system
+            "memory_usage": "256MB",  # TODO: Get from monitoring system
         }
 
     def _analyze_code(self, code: str, runtime: str) -> dict:
