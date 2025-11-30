@@ -21,10 +21,13 @@ class JobUpdate(BaseModel):
     result: Optional[str] = None
 
 
-class JobResponse(JobBase):
-    id: int
+class JobResponse(BaseModel):
+    job_id: int = Field(validation_alias="id")
+    function_id: int
+    status: JobStatus
     result: Optional[Any] = None
     timestamp: datetime
 
     class Config:
         from_attributes = True
+        populate_by_name = True

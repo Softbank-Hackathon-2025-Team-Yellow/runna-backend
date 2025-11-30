@@ -1,5 +1,7 @@
 
-from fastapi import APIRouter, Depends
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
@@ -10,6 +12,8 @@ from app.schemas.function import (
     FunctionUpdate,
     InvokeFunctionRequest,
 )
+from app.models.job import JobStatus
+from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
 from app.services.function_service import FunctionService
 from app.services.job_service import JobService
@@ -79,29 +83,46 @@ def delete_function(function_id: int, db: Session = Depends(get_db)):
     return create_success_response(None)
 
 
-@router.post("/{function_id}/invoke")
-def invoke_function(
-    function_id: int, request: InvokeFunctionRequest, db: Session = Depends(get_db)
+@router.post("/{function_id}/invoke", response_model=JobResponse)
+async def invoke_function(
+    function_id: int,
+    request: InvokeFunctionRequest,
+    response: Response,
+    db: Session = Depends(get_db),
 ):
+    """
+    변경사항:
+      - `ExecutionService`의 Non-blocking I/O 지원을 위해 `async def`로 변경했습니다.
+      - 더 나은 타입 안전성을 위해 Dict 대신 `Job` 객체(JobResponse로 매핑됨)를 반환합니다.
+    """
     try:
         service = ExecutionService(db)
-        result = service.execute_function(function_id, request.to_dict())
-        return create_success_response(result)
+        job = await service.execute_function(function_id, request.model_dump().get("input", {}))
+        
+        # Set status code based on job status
+        if job.status == JobStatus.PENDING:
+            response.status_code = status.HTTP_202_ACCEPTED
+        else:
+            response.status_code = status.HTTP_200_OK
+            
+        return job
     except ValueError as e:
-        return create_error_response("FUNCTION_NOT_FOUND", str(e))
-    except Exception:
-        return create_error_response("EXECUTION_ERROR", "Function execution failed")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        # Log error
+        print(f"Execution error: {e}")
+        raise HTTPException(status_code=500, detail="Function execution failed")
 
 
-@router.get("/{function_id}/jobs")
+@router.get("/{function_id}/jobs", response_model=List[JobResponse])
 def get_function_jobs(function_id: int, db: Session = Depends(get_db)):
     try:
         service = JobService(db)
         jobs = service.get_job_by_function_id(function_id)
-        return create_success_response({"jobs": jobs})
+        return jobs
     except Exception as e:
         print(e)
-        return create_error_response("INTERNAL_ERROR", "Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{function_id}/metrics")
