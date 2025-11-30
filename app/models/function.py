@@ -20,7 +20,7 @@ class Function(Base):
     __tablename__ = "functions"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, index=True, nullable=False)
+    name = Column(String(255), unique=False, index=True, nullable=False)
     runtime = Column(Enum(Runtime), nullable=False)
     code = Column(Text, nullable=False)
     execution_type = Column(Enum(ExecutionType), nullable=False)

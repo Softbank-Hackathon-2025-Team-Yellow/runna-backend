@@ -7,6 +7,7 @@ from app.schemas.function import FunctionCreate, FunctionUpdate, FunctionRespons
 from app.schemas.job import JobResponse
 from app.services.function_service import FunctionService
 from app.services.execution_service import ExecutionService
+from app.services.job_service import JobService
 from app.core.response import create_success_response, create_error_response
 
 router = APIRouter()
@@ -101,10 +102,11 @@ def get_function_jobs(
     db: Session = Depends(get_db)
 ):
     try:
-        service = ExecutionService(db)
-        jobs = service.get_function_jobs(function_id)
+        service = JobService(db)
+        jobs = service.get_job_by_function_id(function_id)
         return create_success_response({"jobs": jobs})
     except Exception as e:
+        print(e)
         return create_error_response("INTERNAL_ERROR", "Internal server error")
 
 
