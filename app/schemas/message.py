@@ -10,8 +10,7 @@ from app.models.function import Runtime
 
 class Execution(BaseModel):
     job_id: int
-    runtime: Runtime
-    code: str
+    function_id: int
     payload: Optional[Dict[str, Any]]
 
 
