@@ -11,6 +11,7 @@ from app.schemas.job import JobCreate
 class ExecutionService:
     def __init__(self, db: Session):
         self.db = db
+        self.exec_service = ExecutionClient()
 
     def execute_function(
         self, function_id: int, input_data: Dict[str, Any]
@@ -33,9 +34,9 @@ class ExecutionService:
             return self._execute_async(job, input_data)
 
     def _execute_sync(self, job: Job, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        ExecutionClient.insert_exec_queue(job, input_data)
+        self.exec_service.insert_exec_queue(job, input_data)
         return job
 
     def _execute_async(self, job: Job, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        ExecutionClient.insert_exec_queue(job, input_data)
+        self.exec_service.insert_exec_queue(job, input_data)
         return job

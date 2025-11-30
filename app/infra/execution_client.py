@@ -1,10 +1,18 @@
 from typing import Any, Dict
 
 from app.models.job import Job
+from app.schemas.message import Execution
+
+from app.infra.redis_service import RedisService
 
 
 class ExecutionClient:
-    async def insert_exec_queue(job: Job, payload: Dict[str, Any]):
+    def __init__(self):
+        self.exec_q_name = "exec"
+        self.callback_q_name = "callback"
+        self.key = "stream"
+
+    def insert_exec_queue(self, job: Job, payload: Dict[str, Any]):
         """
         비동기로 실행 큐에 요청을 삽입합니다
         job : 생성한 Job Entity
@@ -12,4 +20,18 @@ class ExecutionClient:
 
         함수 실행 결과는 job_completed pub/sub을 통해 받을 수 있습니다.
         """
-        pass
+
+        redis_service = RedisService()
+
+        exec_msg = Execution(
+            job_id=job.id,
+            code=job.function.code,
+            runtime=job.function.runtime,
+            payload=payload,
+        )
+
+        try:
+            redis_service.lpush(self.exec_q_name, self.key, exec_msg)
+
+        except Exception as e:
+            print("Execution Request Push Failed. (job: {job.id})")
