@@ -7,12 +7,26 @@ from app.schemas.message import Callback, Execution
 
 
 class ExecutionClient:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
+        # 싱글톤 패턴으로 중복 초기화 방지
+        if ExecutionClient._initialized:
+            return
+
         self.redis_service = RedisService()
         self.exec_stream_name = "exec_stream"
         self.callback_channel_name = "callback_channel"
         self.consumer_group_name = "exec_consumers"
         self.waiters = {}  # {job_id: asyncio.Future} - sync 요청 대기용
+
+        ExecutionClient._initialized = True
 
     async def invoke_sync(self, job: Job, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
