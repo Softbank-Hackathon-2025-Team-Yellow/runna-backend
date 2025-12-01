@@ -9,6 +9,9 @@ from sqlalchemy.orm import sessionmaker
 from app.database import Base, get_db
 from app.dependencies import get_execution_client
 from app.infra.execution_client import ExecutionClient
+# Import models to register them with SQLAlchemy metadata
+from app.models.function import Function
+from app.models.job import Job
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 

@@ -1,5 +1,6 @@
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
@@ -10,7 +11,6 @@ from app.schemas.function import (
     FunctionCreate,
     FunctionResponse,
     FunctionUpdate,
-    InvokeFunctionRequest,
 )
 from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
@@ -85,13 +85,13 @@ def delete_function(function_id: int, db: Session = Depends(get_db)):
 @router.post("/{function_id}/invoke")
 async def invoke_function(
     function_id: int,
-    request: InvokeFunctionRequest,
+    request: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     exec_client: ExecutionClient = Depends(get_execution_client),
 ):
     try:
         service = ExecutionService(db, exec_client)  # DI로 주입
-        job = await service.execute_function(function_id, request.to_dict())
+        job = await service.execute_function(function_id, request)
         # Convert Job object to JobResponse schema for consistent API response
         job_response = JobResponse.model_validate(job)
         return create_success_response(job_response.model_dump())
