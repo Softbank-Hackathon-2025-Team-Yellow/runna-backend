@@ -82,7 +82,7 @@ class ExecutionService:
             result = await self.exec_client.invoke_sync(job, input_data)
 
             # Check result status and update Job accordingly
-            if result.get("status") == "succeeded":
+            if result.get("status") == "success":
                 job.status = JobStatus.SUCCESS  # ✅ SUCCEEDED → SUCCESS
                 job.result = json.dumps(
                     result.get("result")
@@ -122,7 +122,7 @@ class ExecutionService:
         2. ⬜ Worker가 Stream에서 작업 읽어서 함수 실행 (KNative 연동 필요)
         3. ⬜ 함수 실행 완료 후 callback_channel에 결과 publish (Worker 구현 필요)
         4. ✅ 백그라운드 리스너가 메시지 수신
-        5. ⬜ Job entity를 SUCCEEDED/FAILED로 업데이트 (DB 세션 필요)
+        5. ⬜ Job entity를 SUCCESS/FAILED로 업데이트 (DB 세션 필요)
 
         변경사항: 일관성을 위해 반환 타입을 Dict에서 Job으로 변경했습니다.
         """
@@ -131,7 +131,7 @@ class ExecutionService:
             await self.exec_client.insert_exec_queue(job, input_data)
 
             # Job status remains PENDING to indicate it's in queue
-            # TODO: [Teammate] 백그라운드 리스너가 SUCCEEDED/FAILED로 업데이트
+            # TODO: [Teammate] 백그라운드 리스너가 SUCCESS/FAILED로 업데이트
         except Exception as e:
             # If enqueue fails, mark as FAILED
             job.status = JobStatus.FAILED

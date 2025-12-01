@@ -17,7 +17,7 @@ def test_get_job_by_id(client: TestClient, mock_exec_client):
 
     # Configure mock for this specific test
     mock_exec_client.invoke_sync.return_value = {
-        "status": "succeeded",
+        "status": "success",
         "result": {"result": "success"},
     }
 
@@ -136,7 +136,7 @@ def test_multiple_jobs_for_function(client: TestClient, mock_exec_client):
 
     # Configure mock with side_effect for multiple calls
     mock_exec_client.invoke_sync.side_effect = [
-        {"status": "succeeded", "result": {"result": "success1"}},
+        {"status": "success", "result": {"result": "success1"}},
         {"status": "failed", "error": "Failed"},
     ]
 

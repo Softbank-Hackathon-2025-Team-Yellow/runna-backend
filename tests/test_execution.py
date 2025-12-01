@@ -16,7 +16,7 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
 
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
-        "status": "succeeded",
+        "status": "success",
         "result": {"result": "test_value"},
     }
 
@@ -106,7 +106,7 @@ def test_get_function_jobs(client: TestClient, mock_exec_client):
 
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
-        "status": "succeeded",
+        "status": "success",
         "result": {"result": "success"},
     }
 
@@ -139,7 +139,7 @@ def test_get_job(client: TestClient, mock_exec_client):
 
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
-        "status": "succeeded",
+        "status": "success",
         "result": {"result": "success"},
     }
 
