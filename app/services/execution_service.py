@@ -7,13 +7,14 @@ from app.infra.execution_client import ExecutionClient
 from app.models.function import ExecutionType, Function
 from app.models.job import Job, JobStatus
 from app.schemas.job import JobCreate
+from app.core.debug import Debug
 
 
 class ExecutionService:
     def __init__(self, db: Session):
         self.db = db
         self.exec_client = ExecutionClient()
-
+        
     async def execute_function(
         self, function_id: int, input_data: Dict[str, Any]
     ) -> Job:
@@ -32,9 +33,13 @@ class ExecutionService:
 
         job = Job(**_job.model_dump())
 
-        self.db.add(job)
-        self.db.commit()
-        self.db.refresh(job)
+        try:
+            self.db.add(job)
+            self.db.commit()
+            self.db.refresh(job)
+
+        except Exception as e:
+            print(e)
 
         if function.execution_type == ExecutionType.SYNC:
             return await self._execute_sync(job, input_data)
@@ -78,4 +83,3 @@ class ExecutionService:
 
         self.db.commit()
         self.db.refresh(job)
-        return job

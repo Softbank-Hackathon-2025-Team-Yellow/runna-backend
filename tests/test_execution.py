@@ -31,10 +31,41 @@ def test_invoke_sync_function_success(client: TestClient):
         assert response.status_code == 200
 
         data = response.json()
-        assert data["status"] == "succeeded"
-        assert "test_value" in data["result"] # Result is JSON string of dict
-        assert "job_id" in data
-        assert data["function_id"] == function_id
+        assert data["success"] is True
+        assert data["data"]["status"] == "succeeded"
+        assert data["data"]["result"]["result"] == "test_value"
+        assert "job_id" in data["data"]
+        assert data["data"]["function_id"] == function_id
+
+
+def test_invoke_sync_function_failure(client: TestClient):
+    # Create a function first
+    function_data = {
+        "name": "test_sync_function",
+        "runtime": "python",
+        "code": "def handler(event): return event",
+        "execution_type": "sync",
+    }
+
+    create_response = client.post("/functions/", json=function_data)
+    function_id = create_response.json()["data"]["function_id"]
+
+    # Mock KNative client to return failure
+    with patch(
+        "app.core.knative_client.knative_client.execute_function_sync"
+    ) as mock_execute:
+        mock_execute.return_value = {"success": False, "error": "Execution failed"}
+
+        # Invoke function
+        invoke_data = {"param1": "test_value"}
+
+        response = client.post(f"/functions/{function_id}/invoke", json=invoke_data)
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["success"] is True
+        assert data["data"]["status"] == "failed"
+        assert data["data"]["result"] is None
 
 
 def test_invoke_async_function(client: TestClient):
@@ -95,11 +126,10 @@ def test_get_function_jobs(client: TestClient):
     assert response.status_code == 200
 
     data = response.json()
-    # data should be a list of jobs
-    assert isinstance(data, list)
-    assert len(data) == 1
-    assert data[0]["function_id"] == function_id
-    assert data[0]["status"] == "succeeded"
+    assert data["success"] is True
+    assert len(data["data"]["jobs"]) == 1
+    assert data["data"]["jobs"][0]["function_id"] == function_id
+    assert data["data"]["jobs"][0]["status"] == "success"
 
 
 def test_get_job(client: TestClient):
