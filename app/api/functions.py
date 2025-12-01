@@ -1,9 +1,13 @@
 
-from fastapi import APIRouter, Depends
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
 from app.database import get_db
+from app.dependencies import get_execution_client
+from app.infra.execution_client import ExecutionClient
 from app.schemas.function import (
     FunctionCreate,
     FunctionResponse,
@@ -82,28 +86,34 @@ def delete_function(function_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{function_id}/invoke")
-def invoke_function(
-    function_id: int, request: InvokeFunctionRequest, db: Session = Depends(get_db)
+async def invoke_function(
+    function_id: int,
+    request: InvokeFunctionRequest,
+    db: Session = Depends(get_db),
+    exec_client: ExecutionClient = Depends(get_execution_client)
 ):
     try:
-        service = ExecutionService(db)
-        result = service.execute_function(function_id, request.to_dict())
-        return create_success_response(result)
+        service = ExecutionService(db, exec_client)  # DI로 주입
+        job = await service.execute_function(function_id, request.to_dict())
+        # Convert Job object to JobResponse schema for consistent API response
+        job_response = JobResponse.model_validate(job)
+        return create_success_response(job_response.model_dump())
     except ValueError as e:
         return create_error_response("FUNCTION_NOT_FOUND", str(e))
     except Exception:
         return create_error_response("EXECUTION_ERROR", "Function execution failed")
 
 
-@router.get("/{function_id}/jobs", response_model=List[JobResponse])
+@router.get("/{function_id}/jobs")
 def get_function_jobs(function_id: int, db: Session = Depends(get_db)):
     try:
         service = JobService(db)
         jobs = service.get_job_by_function_id(function_id)
-        return jobs
+        job_responses = [JobResponse.model_validate(job) for job in jobs]
+        return create_success_response({"jobs": [job.model_dump() for job in job_responses]})
     except Exception as e:
         print(e)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return create_error_response("INTERNAL_ERROR", "Internal server error")
 
 
 @router.get("/{function_id}/metrics")
