@@ -1,11 +1,13 @@
 import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
 from app.api import functions, jobs
 from app.core.redis import RedisClient
 from app.infra.execution_client import ExecutionClient
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +22,7 @@ async def lifespan(app: FastAPI):
     listener_task.cancel()
     RedisClient.close()
     print("[Main] Shutdown complete")
+
 
 app = FastAPI(
     title="Function Runner API",

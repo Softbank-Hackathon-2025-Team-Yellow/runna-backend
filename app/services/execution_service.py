@@ -7,14 +7,13 @@ from app.infra.execution_client import ExecutionClient
 from app.models.function import ExecutionType, Function
 from app.models.job import Job, JobStatus
 from app.schemas.job import JobCreate
-from app.core.debug import Debug
 
 
 class ExecutionService:
     def __init__(self, db: Session, exec_client: ExecutionClient = None):
         """
         Initialize ExecutionService.
-        
+
         Args:
             db: Database session
             exec_client: ExecutionClient instance (optional, for dependency injection)
@@ -22,7 +21,7 @@ class ExecutionService:
         """
         self.db = db
         self.exec_client = exec_client if exec_client is not None else ExecutionClient()
-        
+
     async def execute_function(
         self, function_id: int, input_data: Dict[str, Any]
     ) -> Job:
@@ -50,7 +49,7 @@ class ExecutionService:
             self.db.add(job)
             self.db.commit()
             self.db.refresh(job)
-        except Exception as e:
+        except Exception:
             self.db.rollback()  # ✅ 롤백 추가
             raise  # ✅ 예외 재발생
 
@@ -85,11 +84,15 @@ class ExecutionService:
             # Check result status and update Job accordingly
             if result.get("status") == "succeeded":
                 job.status = JobStatus.SUCCESS  # ✅ SUCCEEDED → SUCCESS
-                job.result = json.dumps(result.get("result"))  # Save only the result field
+                job.result = json.dumps(
+                    result.get("result")
+                )  # Save only the result field
             else:
                 # Failed or any other status
                 job.status = JobStatus.FAILED
-                job.result = result.get("error") or result.get("result") or "Unknown error"
+                job.result = (
+                    result.get("error") or result.get("result") or "Unknown error"
+                )
         except Exception as e:
             # Update Job status to FAILED on exception
             job.status = JobStatus.FAILED

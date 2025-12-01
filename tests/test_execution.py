@@ -1,7 +1,5 @@
 from fastapi.testclient import TestClient
 
-from app.models.job import JobStatus
-
 
 def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
     # Create a function first
@@ -19,7 +17,7 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
         "status": "succeeded",
-        "result": {"result": "test_value"}
+        "result": {"result": "test_value"},
     }
 
     # Invoke function
@@ -50,7 +48,7 @@ def test_invoke_sync_function_failure(client: TestClient, mock_exec_client):
     # Configure mock for failure
     mock_exec_client.invoke_sync.return_value = {
         "status": "failed",
-        "error": "Execution failed"
+        "error": "Execution failed",
     }
 
     # Invoke function
@@ -109,7 +107,7 @@ def test_get_function_jobs(client: TestClient, mock_exec_client):
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
         "status": "succeeded",
-        "result": {"result": "success"}
+        "result": {"result": "success"},
     }
 
     # Invoke function to create a job
@@ -142,7 +140,7 @@ def test_get_job(client: TestClient, mock_exec_client):
     # Configure mock for success
     mock_exec_client.invoke_sync.return_value = {
         "status": "succeeded",
-        "result": {"result": "success"}
+        "result": {"result": "success"},
     }
 
     # Invoke function

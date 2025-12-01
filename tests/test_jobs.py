@@ -1,5 +1,4 @@
 import json
-from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -19,7 +18,7 @@ def test_get_job_by_id(client: TestClient, mock_exec_client):
     # Configure mock for this specific test
     mock_exec_client.invoke_sync.return_value = {
         "status": "succeeded",
-        "result": {"result": "success"}
+        "result": {"result": "success"},
     }
 
     # Invoke function to create a job
@@ -37,7 +36,7 @@ def test_get_job_by_id(client: TestClient, mock_exec_client):
     assert data["data"]["job_id"] == job_id
     assert data["data"]["function_id"] == function_id
     assert data["data"]["status"] == "success"  # ✅ succeeded → success
-    
+
     # Result is stored as JSON string, so parse it first
     result = (
         json.loads(data["data"]["result"])
@@ -71,7 +70,7 @@ def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client
     # Configure mock to return failure
     mock_exec_client.invoke_sync.return_value = {
         "status": "failed",
-        "error": "Execution failed"
+        "error": "Execution failed",
     }
 
     # Invoke function
@@ -138,19 +137,15 @@ def test_multiple_jobs_for_function(client: TestClient, mock_exec_client):
     # Configure mock with side_effect for multiple calls
     mock_exec_client.invoke_sync.side_effect = [
         {"status": "succeeded", "result": {"result": "success1"}},
-        {"status": "failed", "error": "Failed"}
+        {"status": "failed", "error": "Failed"},
     ]
 
     # First successful execution
-    invoke1 = client.post(
-        f"/functions/{function_id}/invoke", json={"param1": "test1"}
-    )
+    invoke1 = client.post(f"/functions/{function_id}/invoke", json={"param1": "test1"})
     job_ids.append(invoke1.json()["data"]["job_id"])
 
     # Second failed execution
-    invoke2 = client.post(
-        f"/functions/{function_id}/invoke", json={"param1": "test2"}
-    )
+    invoke2 = client.post(f"/functions/{function_id}/invoke", json={"param1": "test2"})
     job_ids.append(invoke2.json()["data"]["job_id"])
 
     # Get function jobs

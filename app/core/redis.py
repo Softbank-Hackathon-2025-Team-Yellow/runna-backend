@@ -1,6 +1,7 @@
-import redis
-from typing import Optional
 from contextlib import asynccontextmanager
+from typing import Optional
+
+import redis
 
 from app.config import settings
 

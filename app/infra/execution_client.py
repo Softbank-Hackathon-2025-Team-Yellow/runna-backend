@@ -1,16 +1,9 @@
 import asyncio
-import json
-import os
-from typing import Any, Dict, Optional
-
-import httpx
-from app.models.job import Job, JobStatus
-from app.schemas.message import Execution, Callback
+from typing import Any, Dict
 
 from app.infra.redis_service import RedisService
-
-
-from app.core.debug import Debug
+from app.models.job import Job
+from app.schemas.message import Callback, Execution
 
 
 class ExecutionClient:
@@ -20,7 +13,6 @@ class ExecutionClient:
         self.callback_channel_name = "callback_channel"
         self.consumer_group_name = "exec_consumers"
         self.waiters = {}  # {job_id: asyncio.Future} - sync 요청 대기용
-
 
     async def invoke_sync(self, job: Job, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -81,7 +73,7 @@ class ExecutionClient:
                 self.exec_stream_name,
                 self.consumer_group_name,
                 id="0",
-                mkstream=True
+                mkstream=True,
             )
 
             message_id = await asyncio.to_thread(
@@ -122,7 +114,9 @@ class ExecutionClient:
                 asyncio.create_task(exec_client.start_callback_listener())
                 yield
         """
-        print(f"[Callback Listener] Starting... (channel: {self.callback_channel_name})")
+        print(
+            f"[Callback Listener] Starting... (channel: {self.callback_channel_name})"
+        )
 
         # Pub/Sub 객체 생성
         pubsub = await asyncio.to_thread(self.redis_service.get_pubsub)
@@ -133,9 +127,7 @@ class ExecutionClient:
 
         # 채널 구독
         await asyncio.to_thread(
-            self.redis_service.subscribe_channel,
-            pubsub,
-            self.callback_channel_name
+            self.redis_service.subscribe_channel, pubsub, self.callback_channel_name
         )
 
         print(f"[Callback Listener] Subscribed to {self.callback_channel_name}")
@@ -144,23 +136,22 @@ class ExecutionClient:
         while True:
             try:
                 # 메시지 수신 (1초 timeout)
-                message = await asyncio.to_thread(
-                    pubsub.get_message,
-                    timeout=1.0
-                )
+                message = await asyncio.to_thread(pubsub.get_message, timeout=1.0)
 
-                if message and message['type'] == 'message':
+                if message and message["type"] == "message":
                     try:
                         # Callback 파싱
-                        callback_data = message['data']
+                        callback_data = message["data"]
 
                         # RedisService의 _deserialize 로직과 동일하게 파싱
                         if isinstance(callback_data, bytes):
-                            callback_data = callback_data.decode('utf-8')
+                            callback_data = callback_data.decode("utf-8")
 
                         callback = Callback.model_validate_json(callback_data)
 
-                        print(f"[Callback Listener] Received callback for job {callback.job_id}: {callback.status}")
+                        print(
+                            f"[Callback Listener] Received callback for job {callback.job_id}: {callback.status}"
+                        )
 
                         # Waiters 맵 확인 (sync 요청용)
                         if callback.job_id in self.waiters:
@@ -169,15 +160,19 @@ class ExecutionClient:
                             # Future에 결과 설정
                             result = {
                                 "status": callback.status.value,
-                                "result": callback.result
+                                "result": callback.result,
                             }
                             waiter.set_result(result)
 
-                            print(f"[Callback Listener] Set result for sync job {callback.job_id}")
+                            print(
+                                f"[Callback Listener] Set result for sync job {callback.job_id}"
+                            )
                         else:
                             # async 요청: Job entity 업데이트
                             # TODO: DB 세션 관리 및 Job 업데이트 로직 필요
-                            print(f"[Callback Listener] TODO: Update async job {callback.job_id} in DB")
+                            print(
+                                f"[Callback Listener] TODO: Update async job {callback.job_id} in DB"
+                            )
 
                     except Exception as e:
                         print(f"[Callback Listener] Error processing message: {e}")

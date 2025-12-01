@@ -1,7 +1,5 @@
 
-from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
@@ -14,7 +12,6 @@ from app.schemas.function import (
     FunctionUpdate,
     InvokeFunctionRequest,
 )
-from app.models.job import JobStatus
 from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
 from app.services.function_service import FunctionService
@@ -90,7 +87,7 @@ async def invoke_function(
     function_id: int,
     request: InvokeFunctionRequest,
     db: Session = Depends(get_db),
-    exec_client: ExecutionClient = Depends(get_execution_client)
+    exec_client: ExecutionClient = Depends(get_execution_client),
 ):
     try:
         service = ExecutionService(db, exec_client)  # DI로 주입
@@ -110,7 +107,9 @@ def get_function_jobs(function_id: int, db: Session = Depends(get_db)):
         service = JobService(db)
         jobs = service.get_job_by_function_id(function_id)
         job_responses = [JobResponse.model_validate(job) for job in jobs]
-        return create_success_response({"jobs": [job.model_dump() for job in job_responses]})
+        return create_success_response(
+            {"jobs": [job.model_dump() for job in job_responses]}
+        )
     except Exception as e:
         print(e)
         return create_error_response("INTERNAL_ERROR", "Internal server error")
