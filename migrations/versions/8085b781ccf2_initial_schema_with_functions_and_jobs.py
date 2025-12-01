@@ -1,3 +1,4 @@
+
 """Initial schema with functions and jobs
 
 Revision ID: 8085b781ccf2

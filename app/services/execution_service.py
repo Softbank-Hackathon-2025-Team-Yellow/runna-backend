@@ -7,6 +7,7 @@ from app.infra.execution_client import ExecutionClient
 from app.models.function import ExecutionType, Function
 from app.models.job import Job, JobStatus
 from app.schemas.job import JobCreate
+from app.services.job_service import JobService
 
 
 class ExecutionService:
@@ -17,7 +18,7 @@ class ExecutionService:
         Args:
             db: Database session
             exec_client: ExecutionClient instance (optional, for dependency injection)
-                        If not provided, creates a new instance (backward compatibility)
+                        If not provided, uses singleton instance
         """
         self.db = db
         self.exec_client = exec_client if exec_client is not None else ExecutionClient()
@@ -52,6 +53,11 @@ class ExecutionService:
         except Exception:
             self.db.rollback()  # ✅ 롤백 추가
             raise  # ✅ 예외 재발생
+
+        try:
+            JobService(self.db).update_job_status(job.id, JobStatus.PENDING)
+        except Exception as e:
+            print(e)
 
         if function.execution_type == ExecutionType.SYNC:
             return await self._execute_sync(job, input_data)
