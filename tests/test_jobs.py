@@ -36,7 +36,7 @@ def test_get_job_by_id(client: TestClient):
     assert data["success"] is True
     assert data["data"]["id"] == job_id
     assert data["data"]["function_id"] == function_id
-    assert data["data"]["status"] == "succeeded"
+    assert data["data"]["status"] == "success"
     # Result is stored as JSON string, so parse it first
     result = (
         json.loads(data["data"]["result"])
@@ -160,5 +160,5 @@ def test_multiple_jobs_for_function(client: TestClient):
     # Check that we have both jobs
     jobs = data["data"]["jobs"]
     statuses = [job["status"] for job in jobs]
-    assert "succeeded" in statuses
+    assert "success" in statuses
     assert "failed" in statuses

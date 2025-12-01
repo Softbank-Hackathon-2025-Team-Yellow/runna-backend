@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql://user:password@localhost:5432/runna_db"
 
+    # Redis
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: Optional[str] = None
+
     # KNative
     knative_url: str = "http://localhost:8080"
     knative_timeout: int = 30

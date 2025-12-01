@@ -56,7 +56,7 @@ def upgrade() -> None:
         sa.Column("function_id", sa.Integer(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("PENDING", "RUNNING", "SUCCEEDED", "FAILED", name="jobstatus"),
+            sa.Enum("PENDING", "RUNNING", "SUCCESS", "FAILED", name="jobstatus"),
             nullable=True,
         ),
         sa.Column("result", sa.Text(), nullable=True),
@@ -66,6 +66,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=True,
         ),
+        sa.Column("duration", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
             ["function_id"],
             ["functions.id"],
@@ -84,4 +85,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_functions_name"), table_name="functions")
     op.drop_index(op.f("ix_functions_id"), table_name="functions")
     op.drop_table("functions")
+    op.drop_type("executiontype")
+    op.drop_type("jobstatus")
+    op.drop_type("runtime")
     # ### end Alembic commands ###
