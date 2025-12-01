@@ -18,7 +18,7 @@ def test_invoke_sync_function_success(client: TestClient):
     assert create_response.status_code == 200
     function_id = create_response.json()["data"]["function_id"]
 
-    # Mock ExecutionClient.invoke_sync
+    # Mock ExecutionClient.invoke_sync (instance method)
     with patch(
         "app.infra.execution_client.ExecutionClient.invoke_sync"
     ) as mock_invoke:
@@ -50,7 +50,7 @@ def test_invoke_async_function(client: TestClient):
     assert create_response.status_code == 200
     function_id = create_response.json()["data"]["function_id"]
 
-    # Mock ExecutionClient.insert_exec_queue
+    # Mock ExecutionClient.insert_exec_queue (instance method)
     with patch(
         "app.infra.execution_client.ExecutionClient.insert_exec_queue"
     ) as mock_enqueue:

@@ -12,6 +12,7 @@ from app.schemas.job import JobCreate
 class ExecutionService:
     def __init__(self, db: Session):
         self.db = db
+        self.exec_client = ExecutionClient()
 
     async def execute_function(
         self, function_id: int, input_data: Dict[str, Any]
@@ -46,7 +47,7 @@ class ExecutionService:
         """
         try:
             # Sync execution: Invoke via Redis and wait for result
-            result = await ExecutionClient.invoke_sync(job, input_data)
+            result = await self.exec_client.invoke_sync(job, input_data)
             
             # Update Job status to SUCCEEDED and save result
             job.status = JobStatus.SUCCEEDED
@@ -66,17 +67,15 @@ class ExecutionService:
         """
         try:
             # Async execution: Enqueue to Redis
-            await ExecutionClient.insert_exec_queue(job, input_data)
-            
-            # Update Job status to ACCEPTED (or PENDING) to indicate it's in queue
-            # We use ACCEPTED to match the API response expectation for 202
-            # job.status = JobStatus.ACCEPTED 
-            pass 
+            await self.exec_client.insert_exec_queue(job, input_data)
+
+            # Job status remains PENDING to indicate it's in queue
+            # Result will be updated via callback when execution completes
         except Exception as e:
             # If enqueue fails, mark as FAILED
             job.status = JobStatus.FAILED
             job.result = f"Failed to enqueue: {str(e)}"
-        
+
         self.db.commit()
         self.db.refresh(job)
         return job
