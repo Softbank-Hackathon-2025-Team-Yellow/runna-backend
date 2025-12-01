@@ -48,7 +48,7 @@ def mock_exec_client():
     - insert_exec_queue: Returns True (success)
     """
     client = Mock(spec=ExecutionClient)
-    client.invoke_sync = AsyncMock(return_value={"status": "succeeded", "result": {}})
+    client.invoke_sync = AsyncMock(return_value={"status": "success", "result": {}})
     client.insert_exec_queue = AsyncMock(return_value=True)
     return client
 
