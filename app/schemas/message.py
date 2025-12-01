@@ -1,11 +1,7 @@
-from datetime import datetime
-from typing import Any, Optional, Dict
 import enum
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
-
-from app.models.job import JobStatus
-from app.models.function import Runtime
 
 
 class Execution(BaseModel):

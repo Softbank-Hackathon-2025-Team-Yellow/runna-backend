@@ -1,5 +1,6 @@
-from app.config import settings
 import functools
+
+from app.config import settings
 
 
 class Debug:

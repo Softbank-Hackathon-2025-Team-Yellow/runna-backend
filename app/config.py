@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     def validate_database_url(cls, v):
         if v.startswith("postgresql://user:password@"):
             print(
-                "⚠️경고: 기본 데이터베이스 설정을 사용 중입니다. .env 파일을 설정하세요."
+                "[WARNING] Using default database settings. Please configure .env file."
             )
         return v
 

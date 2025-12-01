@@ -1,6 +1,7 @@
 import json
-import redis
 from typing import Any, Dict, List, Optional, Union
+
+import redis
 from pydantic import BaseModel
 
 from app.core.redis import get_redis_client

@@ -1,10 +1,9 @@
 import json
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 
-def test_get_job_by_id(client: TestClient):
+def test_get_job_by_id(client: TestClient, mock_exec_client):
     # Create a function first
     function_data = {
         "name": "test_function",
@@ -16,17 +15,17 @@ def test_get_job_by_id(client: TestClient):
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
 
-    # Mock successful execution to create a job
-    with patch(
-        "app.core.knative_client.knative_client.execute_function_sync"
-    ) as mock_execute:
-        mock_execute.return_value = {"success": True, "output": {"result": "success"}}
+    # Configure mock for this specific test
+    mock_exec_client.invoke_sync.return_value = {
+        "status": "success",
+        "result": {"result": "success"},
+    }
 
-        # Invoke function to create a job
-        invoke_response = client.post(
-            f"/functions/{function_id}/invoke", json={"param1": "test"}
-        )
-        job_id = invoke_response.json()["data"]["id"]
+    # Invoke function to create a job
+    invoke_response = client.post(
+        f"/functions/{function_id}/invoke", json={"param1": "test"}
+    )
+    job_id = invoke_response.json()["data"]["job_id"]
 
     # Get job by ID
     response = client.get(f"/jobs/{job_id}")
@@ -34,9 +33,10 @@ def test_get_job_by_id(client: TestClient):
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["id"] == job_id
+    assert data["data"]["job_id"] == job_id
     assert data["data"]["function_id"] == function_id
-    assert data["data"]["status"] == "success"
+    assert data["data"]["status"] == "success"  # ✅ succeeded → success
+
     # Result is stored as JSON string, so parse it first
     result = (
         json.loads(data["data"]["result"])
@@ -55,7 +55,7 @@ def test_get_nonexistent_job(client: TestClient):
     assert "JOB_NOT_FOUND" in data["error"]["code"]
 
 
-def test_job_creation_with_failed_execution(client: TestClient):
+def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client):
     # Create a function
     function_data = {
         "name": "test_function",
@@ -67,17 +67,17 @@ def test_job_creation_with_failed_execution(client: TestClient):
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
 
-    # Mock failed execution
-    with patch(
-        "app.core.knative_client.knative_client.execute_function_sync"
-    ) as mock_execute:
-        mock_execute.return_value = {"success": False, "error": "Execution failed"}
+    # Configure mock to return failure
+    mock_exec_client.invoke_sync.return_value = {
+        "status": "failed",
+        "error": "Execution failed",
+    }
 
-        # Invoke function
-        invoke_response = client.post(
-            f"/functions/{function_id}/invoke", json={"param1": "test"}
-        )
-        job_id = invoke_response.json()["data"]["id"]
+    # Invoke function
+    invoke_response = client.post(
+        f"/functions/{function_id}/invoke", json={"param1": "test"}
+    )
+    job_id = invoke_response.json()["data"]["job_id"]
 
     # Get the failed job
     response = client.get(f"/jobs/{job_id}")
@@ -86,10 +86,10 @@ def test_job_creation_with_failed_execution(client: TestClient):
     data = response.json()
     assert data["success"] is True
     assert data["data"]["status"] == "failed"
-    assert data["data"]["result"] is None
+    assert data["data"]["result"] is not None
 
 
-def test_async_job_creation(client: TestClient):
+def test_async_job_creation(client: TestClient, mock_exec_client):
     # Create an async function
     function_data = {
         "name": "test_async_function",
@@ -101,11 +101,14 @@ def test_async_job_creation(client: TestClient):
     create_response = client.post("/functions/", json=function_data)
     function_id = create_response.json()["data"]["function_id"]
 
+    # Mock insert_exec_queue returns True
+    mock_exec_client.insert_exec_queue.return_value = True
+
     # Invoke async function
     invoke_response = client.post(
         f"/functions/{function_id}/invoke", json={"param1": "test"}
     )
-    job_id = invoke_response.json()["data"]["id"]
+    job_id = invoke_response.json()["data"]["job_id"]
 
     # Get the pending job
     response = client.get(f"/jobs/{job_id}")
@@ -117,7 +120,7 @@ def test_async_job_creation(client: TestClient):
     assert data["data"]["result"] is None
 
 
-def test_multiple_jobs_for_function(client: TestClient):
+def test_multiple_jobs_for_function(client: TestClient, mock_exec_client):
     # Create a function
     function_data = {
         "name": "test_function",
@@ -131,23 +134,19 @@ def test_multiple_jobs_for_function(client: TestClient):
 
     job_ids = []
 
-    # Create multiple jobs with different outcomes
-    with patch(
-        "app.core.knative_client.knative_client.execute_function_sync"
-    ) as mock_execute:
-        # First successful execution
-        mock_execute.return_value = {"success": True, "output": {"result": "success1"}}
-        invoke1 = client.post(
-            f"/functions/{function_id}/invoke", json={"param1": "test1"}
-        )
-        job_ids.append(invoke1.json()["data"]["id"])
+    # Configure mock with side_effect for multiple calls
+    mock_exec_client.invoke_sync.side_effect = [
+        {"status": "success", "result": {"result": "success1"}},
+        {"status": "failed", "error": "Failed"},
+    ]
 
-        # Second failed execution
-        mock_execute.return_value = {"success": False, "error": "Failed"}
-        invoke2 = client.post(
-            f"/functions/{function_id}/invoke", json={"param1": "test2"}
-        )
-        job_ids.append(invoke2.json()["data"]["id"])
+    # First successful execution
+    invoke1 = client.post(f"/functions/{function_id}/invoke", json={"param1": "test1"})
+    job_ids.append(invoke1.json()["data"]["job_id"])
+
+    # Second failed execution
+    invoke2 = client.post(f"/functions/{function_id}/invoke", json={"param1": "test2"})
+    job_ids.append(invoke2.json()["data"]["job_id"])
 
     # Get function jobs
     response = client.get(f"/functions/{function_id}/jobs")
@@ -160,5 +159,5 @@ def test_multiple_jobs_for_function(client: TestClient):
     # Check that we have both jobs
     jobs = data["data"]["jobs"]
     statuses = [job["status"] for job in jobs]
-    assert "success" in statuses
+    assert "success" in statuses  # ✅ succeeded → success
     assert "failed" in statuses
