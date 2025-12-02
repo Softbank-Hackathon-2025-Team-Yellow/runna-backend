@@ -49,7 +49,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_functions_id"), "functions", ["id"], unique=False)
-    op.create_index(op.f("ix_functions_name"), "functions", ["name"], unique=True)
     op.create_table(
         "jobs",
         sa.Column("id", sa.Integer(), nullable=False),

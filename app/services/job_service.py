@@ -18,14 +18,19 @@ class JobService:
     def update_job_status(
         self, id: int, status: JobStatus, result: Optional[str] = None
     ) -> Optional[Job]:
-        job = self.get_job_by_id(id)
-        if not job:
-            return None
+        try:
+            job = self.get_job_by_id(id)
+            if not job:
+                return None
 
-        job.status = status
-        if result:
-            job.result = result
+            job.status = status
+            if result:
+                job.result = result
 
-        self.db.commit()
-        self.db.refresh(job)
-        return job
+            self.db.commit()
+            self.db.refresh(job)
+            return job
+        except Exception as e:
+            print(f"Error updating job status: {e}")
+            self.db.rollback()
+            raise e
