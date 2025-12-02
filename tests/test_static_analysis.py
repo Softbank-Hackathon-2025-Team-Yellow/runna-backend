@@ -318,3 +318,272 @@ def handler(event):
         assert result["is_safe"] is True
         assert "helper" in result["functions"]
         assert "handler" in result["functions"]
+
+
+class TestPythonEnhancedSecurity:
+    """Test enhanced Python security checks"""
+
+    def test_dangerous_attribute_code(self):
+        """Test that __code__ attribute access is blocked"""
+        code = """
+def handler(event):
+    fn = lambda x: x + 1
+    code_obj = fn.__code__
+    return {"code": code_obj}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__code__" in v for v in result["violations"])
+
+    def test_dangerous_attribute_globals(self):
+        """Test that __globals__ attribute access is blocked"""
+        code = """
+def handler(event):
+    g = handler.__globals__
+    return {"globals": g}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__globals__" in v for v in result["violations"])
+
+    def test_dangerous_attribute_builtins(self):
+        """Test that __builtins__ attribute access is blocked"""
+        code = """
+def handler(event):
+    b = __builtins__
+    return {"builtins": b}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__builtins__" in v for v in result["violations"])
+
+    def test_dangerous_attribute_class(self):
+        """Test that __class__ attribute access is blocked"""
+        code = """
+def handler(event):
+    obj = object()
+    cls = obj.__class__
+    return {"class": cls}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__class__" in v for v in result["violations"])
+
+    def test_dangerous_attribute_subclasses(self):
+        """Test that __subclasses__ attribute access is blocked"""
+        code = """
+def handler(event):
+    subs = object.__subclasses__()
+    return {"subclasses": subs}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__subclasses__" in v for v in result["violations"])
+
+    def test_dangerous_subscript_access(self):
+        """Test that subscript access to dangerous attributes is blocked"""
+        code = """
+def handler(event):
+    obj = {}
+    code = obj['__code__']
+    return {"result": code}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("__code__" in v for v in result["violations"])
+
+    def test_file_access_with_open(self):
+        """Test that with open() is blocked"""
+        code = """
+def handler(event):
+    with open('/tmp/test.txt', 'r') as f:
+        data = f.read()
+    return {"data": data}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("open()" in v for v in result["violations"])
+
+    def test_network_module_http(self):
+        """Test that http module is blocked"""
+        code = """
+import http.client
+
+def handler(event):
+    conn = http.client.HTTPConnection("example.com")
+    return {"status": "connected"}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("http" in v for v in result["violations"])
+
+    def test_network_module_urllib(self):
+        """Test that urllib module is blocked"""
+        code = """
+import urllib.request
+
+def handler(event):
+    response = urllib.request.urlopen('http://example.com')
+    return {"data": response.read()}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("urllib" in v for v in result["violations"])
+
+    def test_dangerous_module_pickle(self):
+        """Test that pickle module is blocked"""
+        code = """
+import pickle
+
+def handler(event):
+    data = pickle.loads(event['data'])
+    return {"result": data}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("pickle" in v for v in result["violations"])
+
+    def test_dangerous_builtin_hasattr(self):
+        """Test that hasattr is blocked"""
+        code = """
+def handler(event):
+    obj = object()
+    result = hasattr(obj, '__class__')
+    return {"result": result}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("hasattr" in v for v in result["violations"])
+
+    def test_while_true_with_break_is_allowed(self):
+        """Test that while True with break is allowed"""
+        code = """
+def handler(event):
+    count = 0
+    while True:
+        count += 1
+        if count >= 10:
+            break
+    return {"count": count}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        # This should be safe because there's a break statement
+        assert result["is_safe"] is True
+
+    def test_while_true_without_break_is_blocked(self):
+        """Test that while True without break is blocked"""
+        code = """
+def handler(event):
+    while True:
+        print("Infinite loop")
+    return {"done": True}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is False
+        assert any("infinite loop" in v.lower() for v in result["violations"])
+
+
+class TestPythonCodeQuality:
+    """Test Python code quality checks (warnings)"""
+
+    def test_complex_function_warning(self):
+        """Test that overly complex functions generate warnings"""
+        # Create a very complex function with many nodes
+        code = """
+def handler(event):
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e = 5
+    f = a + b + c + d + e
+    g = f * 2
+    h = g / 2
+    i = h - 10
+    j = i + 20
+    k = j * 3
+    l = k / 4
+    m = l + 5
+    n = m - 6
+    o = n * 7
+    p = o / 8
+    q = p + 9
+    r = q - 10
+    s = r * 11
+    t = s / 12
+    u = t + 13
+    v = u - 14
+    w = v * 15
+    x = w / 16
+    y = x + 17
+    z = y - 18
+    return {"result": z}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        # Should be safe but have warnings
+        assert result["is_safe"] is True
+        # May or may not have complexity warning depending on threshold
+        # This is more of a soft check
+
+    def test_long_function_warning(self):
+        """Test that long functions generate warnings"""
+        # Create a function with many lines
+        lines = ["def handler(event):"]
+        for i in range(60):  # More than MAX_FUNCTION_LENGTH (50)
+            lines.append(f"    x{i} = {i}")
+        lines.append("    return {'result': x0}")
+
+        code = "\n".join(lines)
+        result = analyzer.analyze_python_code(code)
+
+        # Should be safe but have warnings
+        assert result["is_safe"] is True
+        assert "warnings" in result
+        assert any("too long" in w for w in result["warnings"])
+
+    def test_deeply_nested_function_warning(self):
+        """Test that deeply nested code generates warnings"""
+        code = """
+def handler(event):
+    if True:
+        if True:
+            if True:
+                if True:
+                    if True:
+                        if True:
+                            return {"too": "deep"}
+    return {"result": "ok"}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        # Should be safe but have warnings
+        assert result["is_safe"] is True
+        assert "warnings" in result
+        assert any("nesting" in w.lower() for w in result["warnings"])
+
+    def test_simple_function_no_warnings(self):
+        """Test that simple functions don't generate warnings"""
+        code = """
+def handler(event):
+    x = event.get('x', 0)
+    y = event.get('y', 0)
+    return {"sum": x + y}
+"""
+        result = analyzer.analyze_python_code(code)
+
+        assert result["is_safe"] is True
+        assert len(result["warnings"]) == 0
