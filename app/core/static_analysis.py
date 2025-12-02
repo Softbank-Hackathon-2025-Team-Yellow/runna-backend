@@ -1,9 +1,11 @@
 import ast
-import json
-import os
-import subprocess
-from pathlib import Path
 from typing import Any, Dict, List
+
+try:
+    import esprima
+    ESPRIMA_AVAILABLE = True
+except ImportError:
+    ESPRIMA_AVAILABLE = False
 
 
 class SecurityAnalyzer:
@@ -64,6 +66,35 @@ class SecurityAnalyzer:
         "gi_frame",
         "gi_code",
         "co_code",
+    ]
+
+    # JavaScript dangerous modules
+    DANGEROUS_JS_MODULES = [
+        "child_process",
+        "fs",
+        "fs/promises",
+        "net",
+        "http",
+        "https",
+        "os",
+        "cluster",
+        "dgram",
+        "dns",
+        "readline",
+        "repl",
+        "tls",
+        "v8",
+        "vm",
+        "worker_threads",
+    ]
+
+    # JavaScript dangerous globals
+    DANGEROUS_JS_GLOBALS = [
+        "eval",
+        "Function",
+        "setTimeout",
+        "setInterval",
+        "setImmediate",
     ]
 
     # Code quality limits
@@ -310,63 +341,59 @@ class SecurityAnalyzer:
 
     def analyze_nodejs_code(self, code: str) -> Dict[str, Any]:
         """
-        Analyze Node.js/JavaScript code using Esprima.
-        서브 프로세스로 Node.js 실행하여 구성.
+        Analyze Node.js/JavaScript code using Python esprima.
         """
-        try:
-            # Get path to js_analyzer.js
-            current_dir = Path(__file__).parent
-            analyzer_script = current_dir / "analyzers" / "js_analyzer.js"
-
-            if not analyzer_script.exists():
-                return {
-                    "is_safe": False,
-                    "violations": [
-                        "JavaScript analyzer script not found. Please ensure js_analyzer.js is installed."
-                    ],
-                    "imports": [],
-                    "functions": [],
-                }
-
-            # Run Node.js analyzer with subprocess / 프로세스가 추가 생성된다.
-            result = subprocess.run(
-                ["node", str(analyzer_script)],
-                input=code,
-                capture_output=True,
-                text=True,
-                timeout=5,  # 5 second timeout
-            )
-
-            # Parse JSON output
-            try:
-                analysis_result = json.loads(result.stdout)
-                return analysis_result
-            except json.JSONDecodeError:
-                # If JSON parsing fails, check stderr
-                error_msg = result.stderr if result.stderr else "Unknown error"
-                return {
-                    "is_safe": False,
-                    "violations": [f"Analysis error: {error_msg}"],
-                    "imports": [],
-                    "functions": [],
-                }
-
-        except subprocess.TimeoutExpired:
-            return {
-                "is_safe": False,
-                "violations": ["Code analysis timeout (exceeded 5 seconds)"],
-                "imports": [],
-                "functions": [],
-            }
-        except FileNotFoundError:
+        if not ESPRIMA_AVAILABLE:
             return {
                 "is_safe": False,
                 "violations": [
-                    "Node.js not found. Please ensure Node.js is installed and in PATH."
+                    "JavaScript analysis unavailable (esprima not installed)"
                 ],
                 "imports": [],
                 "functions": [],
             }
+
+        try:
+            # Try parsing as ES6 module first (supports import/export)
+            try:
+                ast_tree = esprima.parseModule(code, {"loc": True, "range": True})
+            except esprima.Error:
+                # If module parsing fails, try as script
+                ast_tree = esprima.parseScript(code, {"loc": True, "range": True})
+
+            # Convert AST to dictionary for easier traversal
+            ast_dict = ast_tree.toDict()
+
+            # Perform analysis
+            violations = []
+            imports = []
+            functions = []
+
+            self._traverse_js_ast(ast_dict, violations, imports, functions)
+
+            return {
+                "is_safe": len(violations) == 0,
+                "violations": violations,
+                "imports": list(set(imports)),  # Remove duplicates
+                "functions": list(set(functions)),
+            }
+
+        except esprima.Error as e:
+            # Syntax error
+            error_message = f"Syntax error: {str(e)}"
+            if hasattr(e, "lineNumber") and hasattr(e, "description"):
+                error_message = (
+                    f"Syntax error at line {e.lineNumber}, "
+                    f"column {e.column}: {e.description}"
+                )
+
+            return {
+                "is_safe": False,
+                "violations": [error_message],
+                "imports": [],
+                "functions": [],
+            }
+
         except Exception as e:
             return {
                 "is_safe": False,
@@ -374,6 +401,145 @@ class SecurityAnalyzer:
                 "imports": [],
                 "functions": [],
             }
+
+    def _traverse_js_ast(
+        self,
+        node: Any,
+        violations: List[str],
+        imports: List[str],
+        functions: List[str],
+    ) -> None:
+        """
+        Recursively traverse JavaScript AST and collect violations.
+        """
+        if not node or not isinstance(node, dict):
+            return
+
+        node_type = node.get("type")
+
+        # Check require() calls
+        if node_type == "CallExpression":
+            callee = node.get("callee", {})
+            if callee.get("type") == "Identifier" and callee.get("name") == "require":
+                arguments = node.get("arguments", [])
+                if arguments and arguments[0].get("type") == "Literal":
+                    module_name = arguments[0].get("value")
+                    imports.append(module_name)
+                    if module_name in self.DANGEROUS_JS_MODULES:
+                        violations.append(
+                            f"Dangerous module import: require('{module_name}')"
+                        )
+
+            # Check dangerous function calls
+            if callee.get("type") == "Identifier":
+                func_name = callee.get("name")
+                if func_name in self.DANGEROUS_JS_GLOBALS:
+                    violations.append(f"Dangerous function call: {func_name}()")
+
+        # Check import declarations
+        elif node_type == "ImportDeclaration":
+            source = node.get("source", {})
+            module_name = source.get("value")
+            if module_name:
+                imports.append(module_name)
+                if module_name in self.DANGEROUS_JS_MODULES:
+                    violations.append(
+                        f"Dangerous module import: import from '{module_name}'"
+                    )
+
+        # Check dynamic imports
+        elif node_type == "ImportExpression":
+            source = node.get("source", {})
+            if source.get("type") == "Literal":
+                module_name = source.get("value")
+                if module_name:
+                    imports.append(module_name)
+                    if module_name in self.DANGEROUS_JS_MODULES:
+                        violations.append(
+                            f"Dangerous module import: import('{module_name}')"
+                        )
+
+        # Check Function constructor (indirect eval)
+        elif node_type == "NewExpression":
+            callee = node.get("callee", {})
+            if callee.get("type") == "Identifier" and callee.get("name") == "Function":
+                violations.append("Dangerous constructor: new Function()")
+
+        # Extract function declarations
+        elif node_type == "FunctionDeclaration":
+            func_id = node.get("id")
+            if func_id and func_id.get("name"):
+                functions.append(func_id["name"])
+
+        # Extract function expressions assigned to variables
+        elif node_type == "VariableDeclarator":
+            var_id = node.get("id", {})
+            init = node.get("init", {})
+            if (
+                var_id.get("type") == "Identifier"
+                and init.get("type") in ["FunctionExpression", "ArrowFunctionExpression"]
+            ):
+                functions.append(var_id["name"])
+
+        # Check for infinite loops
+        elif node_type in ["WhileStatement", "ForStatement"]:
+            if self._js_might_be_infinite_loop(node):
+                violations.append("Potential infinite loop detected")
+
+        # Recursively traverse child nodes
+        for key, value in node.items():
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        self._traverse_js_ast(item, violations, imports, functions)
+            elif isinstance(value, dict):
+                self._traverse_js_ast(value, violations, imports, functions)
+
+    def _js_might_be_infinite_loop(self, node: Dict[str, Any]) -> bool:
+        """
+        Basic heuristic to detect potential infinite loops in JavaScript.
+        """
+        node_type = node.get("type")
+
+        # While(true) pattern
+        if node_type == "WhileStatement":
+            test = node.get("test", {})
+            if test.get("type") == "Literal" and test.get("value") is True:
+                # Check if there's a break statement in the body
+                has_break = self._js_has_break_statement(node.get("body"))
+                return not has_break
+
+        # For(;;) pattern
+        if node_type == "ForStatement":
+            test = node.get("test")
+            if test is None or (
+                test.get("type") == "Literal" and test.get("value") is True
+            ):
+                has_break = self._js_has_break_statement(node.get("body"))
+                return not has_break
+
+        return False
+
+    def _js_has_break_statement(self, node: Any) -> bool:
+        """
+        Check if a JavaScript AST node contains a break statement.
+        """
+        if not node or not isinstance(node, dict):
+            return False
+
+        if node.get("type") == "BreakStatement":
+            return True
+
+        # Recursively check child nodes
+        for key, value in node.items():
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict) and self._js_has_break_statement(item):
+                        return True
+            elif isinstance(value, dict) and self._js_has_break_statement(value):
+                return True
+
+        return False
 
 
 analyzer = SecurityAnalyzer()
