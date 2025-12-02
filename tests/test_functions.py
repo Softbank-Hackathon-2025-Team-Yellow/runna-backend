@@ -143,3 +143,56 @@ def test_create_function_with_invalid_code(client: TestClient):
     data = response.json()
     assert data["success"] is False
     assert "VALIDATION_ERROR" in data["error"]["code"]
+
+
+def test_create_nodejs_function_with_syntax_error(client: TestClient):
+    """Test that JavaScript syntax errors are caught"""
+    function_data = {
+        "name": "broken_js_function",
+        "runtime": "nodejs",
+        "code": "function handler(event { return { message: 'Hello' }; }",  # Missing )
+        "execution_type": "sync",
+    }
+
+    response = client.post("/functions/", json=function_data)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["success"] is False
+    assert "VALIDATION_ERROR" in data["error"]["code"]
+    assert "Syntax error" in data["error"]["message"]
+
+
+def test_create_nodejs_function_with_dangerous_module(client: TestClient):
+    """Test that dangerous Node.js modules are blocked"""
+    function_data = {
+        "name": "malicious_nodejs_function",
+        "runtime": "nodejs",
+        "code": "const fs = require('fs'); function handler(e) { return fs.readFileSync('/etc/passwd'); }",
+        "execution_type": "sync",
+    }
+
+    response = client.post("/functions/", json=function_data)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["success"] is False
+    assert "VALIDATION_ERROR" in data["error"]["code"]
+    assert "fs" in data["error"]["message"]
+
+
+def test_create_valid_nodejs_function(client: TestClient):
+    """Test that valid JavaScript code is accepted"""
+    function_data = {
+        "name": "valid_nodejs_function",
+        "runtime": "nodejs",
+        "code": "function handler(event) { return { message: 'Hello World', data: event }; }",
+        "execution_type": "sync",
+    }
+
+    response = client.post("/functions/", json=function_data)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["success"] is True
+    assert "function_id" in data["data"]

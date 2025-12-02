@@ -47,6 +47,12 @@ cython_debug/
 *.log
 
 # -----------------------------
+# Node.js (for JavaScript static analyzer)
+# -----------------------------
+node_modules/
+package-lock.json
+
+# -----------------------------
 # 기타
 # -----------------------------
 CLAUDE.md
