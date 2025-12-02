@@ -51,6 +51,8 @@ cython_debug/
 # -----------------------------
 CLAUDE.md
 note.md
+task.md
+
 .idea/
 
 Architecture
