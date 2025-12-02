@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
+    # Worker/Redis Stream 설정
+    exec_stream_name: str = "exec_stream"
+    callback_channel_name: str = "callback_channel"
+    consumer_group_name: str = "exec_consumers"
+
+    # Worker 처리 설정
+    worker_max_messages: int = 1
+    worker_block_time_ms: int = 1000
+    worker_timeout_seconds: int = 30
+
     @field_validator("secret_key", mode="before")
     @classmethod
     def generate_secret_key(cls, v):
