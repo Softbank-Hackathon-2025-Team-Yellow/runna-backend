@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
+from app.config import settings
 from app.infra.async_redis_service import AsyncRedisService
 from app.models.job import Job
 from app.schemas.message import Callback, Execution
@@ -21,9 +22,9 @@ class ExecutionClient:
             return
 
         self.async_redis_service = AsyncRedisService()  # 완전 async Redis 통합
-        self.exec_stream_name = "exec_stream"
-        self.callback_channel_name = "callback_channel"
-        self.consumer_group_name = "exec_consumers"
+        self.exec_stream_name = settings.exec_stream_name
+        self.callback_channel_name = settings.callback_channel_name
+        self.consumer_group_name = settings.consumer_group_name
         self.waiters = {}  # {job_id: asyncio.Future} - sync 요청 대기용
 
         ExecutionClient._initialized = True
@@ -54,15 +55,15 @@ class ExecutionClient:
             # 2. Stream에 작업 추가 (이미 waiter가 등록된 상태)
             await self.insert_exec_queue(job, payload)
 
-            # 결과 대기 (timeout 30초)
+            # 결과 대기 (timeout 설정값 사용)
             try:
-                result = await asyncio.wait_for(waiter, timeout=30.0)
+                result = await asyncio.wait_for(waiter, timeout=settings.worker_timeout_seconds)
                 return result
             except asyncio.TimeoutError:
                 # 타임아웃 시 Future 취소
                 if not waiter.done():
                     waiter.cancel()
-                return {"status": "failed", "result": "Execution timeout (30s)"}
+                return {"status": "failed", "result": f"Execution timeout ({settings.worker_timeout_seconds}s)"}
         finally:
             # Waiter 정리 - 완료되지 않은 Future 취소
             waiter = self.waiters.pop(job.id, None)
