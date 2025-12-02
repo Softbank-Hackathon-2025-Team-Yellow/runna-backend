@@ -1,0 +1,12 @@
+{
+  "name": "runna-js-analyzer",
+  "version": "1.0.0",
+  "description": "JavaScript static analyzer for Runna using Esprima",
+  "main": "js_analyzer.js",
+  "dependencies": {
+    "esprima": "^4.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

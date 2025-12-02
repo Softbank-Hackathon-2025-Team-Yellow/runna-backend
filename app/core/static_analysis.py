@@ -1,5 +1,8 @@
 import ast
-import re
+import json
+import os
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, List
 
 
@@ -103,54 +106,71 @@ class SecurityAnalyzer:
         return False
 
     def analyze_nodejs_code(self, code: str) -> Dict[str, Any]:
-        violations = []
+        """
+        Analyze Node.js/JavaScript code using Esprima.
+        Uses subprocess to call Node.js analyzer script.
+        """
+        try:
+            # Get path to js_analyzer.js
+            current_dir = Path(__file__).parent
+            analyzer_script = current_dir / "analyzers" / "js_analyzer.js"
 
-        dangerous_patterns = [
-            r"require\s*\(\s*['\"]child_process['\"]\s*\)",
-            r"require\s*\(\s*['\"]fs['\"]\s*\)",
-            r"require\s*\(\s*['\"]os['\"]\s*\)",
-            r"eval\s*\(",
-            r"Function\s*\(",
-            r"setTimeout\s*\(",
-            r"setInterval\s*\(",
-        ]
+            if not analyzer_script.exists():
+                return {
+                    "is_safe": False,
+                    "violations": [
+                        "JavaScript analyzer script not found. Please ensure js_analyzer.js is installed."
+                    ],
+                    "imports": [],
+                    "functions": [],
+                }
 
-        for pattern in dangerous_patterns:
-            if re.search(pattern, code):
-                violations.append(f"Dangerous pattern detected: {pattern}")
+            # Run Node.js analyzer with subprocess
+            result = subprocess.run(
+                ["node", str(analyzer_script)],
+                input=code,
+                capture_output=True,
+                text=True,
+                timeout=5,  # 5 second timeout
+            )
 
-        return {
-            "is_safe": len(violations) == 0,
-            "violations": violations,
-            "imports": self._extract_nodejs_imports(code),
-            "functions": self._extract_nodejs_functions(code),
-        }
+            # Parse JSON output
+            try:
+                analysis_result = json.loads(result.stdout)
+                return analysis_result
+            except json.JSONDecodeError:
+                # If JSON parsing fails, check stderr
+                error_msg = result.stderr if result.stderr else "Unknown error"
+                return {
+                    "is_safe": False,
+                    "violations": [f"Analysis error: {error_msg}"],
+                    "imports": [],
+                    "functions": [],
+                }
 
-    def _extract_nodejs_imports(self, code: str) -> List[str]:
-        imports = []
-        require_pattern = r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)"
-        import_pattern = r"import\s+.*?from\s+['\"]([^'\"]+)['\"]"
-
-        for match in re.finditer(require_pattern, code):
-            imports.append(match.group(1))
-
-        for match in re.finditer(import_pattern, code):
-            imports.append(match.group(1))
-
-        return imports
-
-    def _extract_nodejs_functions(self, code: str) -> List[str]:
-        functions = []
-        function_pattern = r"function\s+(\w+)\s*\("
-        arrow_function_pattern = r"const\s+(\w+)\s*=\s*\([^)]*\)\s*=>"
-
-        for match in re.finditer(function_pattern, code):
-            functions.append(match.group(1))
-
-        for match in re.finditer(arrow_function_pattern, code):
-            functions.append(match.group(1))
-
-        return functions
+        except subprocess.TimeoutExpired:
+            return {
+                "is_safe": False,
+                "violations": ["Code analysis timeout (exceeded 5 seconds)"],
+                "imports": [],
+                "functions": [],
+            }
+        except FileNotFoundError:
+            return {
+                "is_safe": False,
+                "violations": [
+                    "Node.js not found. Please ensure Node.js is installed and in PATH."
+                ],
+                "imports": [],
+                "functions": [],
+            }
+        except Exception as e:
+            return {
+                "is_safe": False,
+                "violations": [f"Unexpected error during analysis: {str(e)}"],
+                "imports": [],
+                "functions": [],
+            }
 
 
 analyzer = SecurityAnalyzer()
