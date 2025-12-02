@@ -12,7 +12,7 @@ from app.infra.execution_client import ExecutionClient
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: 백그라운드 리스너 시작
-    exec_client = ExecutionClient()
+    exec_client = ExecutionClient()  # __new__ ensures singleton
     listener_task = asyncio.create_task(exec_client.start_callback_listener())
     print("[Main] Callback listener started")
 
@@ -20,6 +20,10 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     listener_task.cancel()
+    try:
+        await exec_client.cleanup()  # Proper async cleanup
+    except Exception as e:
+        print(f"[Main] Cleanup error: {e}")
     RedisClient.close()
     print("[Main] Shutdown complete")
 
