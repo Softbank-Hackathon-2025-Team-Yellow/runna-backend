@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import functions, jobs
+from app.api import functions, jobs, users
 from app.core.redis import RedisClient
 from app.infra.execution_client import ExecutionClient
 
@@ -44,6 +44,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(functions.router, prefix="/functions", tags=["functions"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 
