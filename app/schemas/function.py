@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -14,7 +15,7 @@ class FunctionBase(BaseModel):
 
 
 class FunctionCreate(FunctionBase):
-    pass
+    workspace_id: uuid.UUID
 
 
 class FunctionUpdate(BaseModel):
@@ -26,6 +27,7 @@ class FunctionUpdate(BaseModel):
 
 class FunctionResponse(FunctionBase):
     id: int
+    workspace_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
 
