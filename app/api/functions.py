@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
 from app.database import get_db
-from app.dependencies import get_execution_client
+from app.dependencies import get_current_user, get_execution_client
+from app.models.user import User
 from app.infra.execution_client import ExecutionClient
 from app.schemas.function import (
     FunctionCreate,
@@ -21,7 +22,9 @@ router = APIRouter()
 
 
 @router.get("/")
-def get_functions(db: Session = Depends(get_db)):
+def get_functions(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     service = FunctionService(db)
     functions = service.list_functions()
     function_responses = [FunctionResponse.model_validate(f) for f in functions]
@@ -29,7 +32,11 @@ def get_functions(db: Session = Depends(get_db)):
 
 
 @router.post("/")
-def create_function(function: FunctionCreate, db: Session = Depends(get_db)):
+def create_function(
+    function: FunctionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
         service = FunctionService(db)
         db_function = service.create_function(function)
@@ -42,7 +49,10 @@ def create_function(function: FunctionCreate, db: Session = Depends(get_db)):
 
 @router.put("/{function_id}")
 def update_function(
-    function_id: int, function_update: FunctionUpdate, db: Session = Depends(get_db)
+    function_id: int,
+    function_update: FunctionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         service = FunctionService(db)
@@ -59,7 +69,11 @@ def update_function(
 
 
 @router.get("/{function_id}")
-def get_function(function_id: int, db: Session = Depends(get_db)):
+def get_function(
+    function_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     service = FunctionService(db)
     function = service.get_function(function_id)
     if not function:
@@ -72,7 +86,11 @@ def get_function(function_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{function_id}")
-def delete_function(function_id: int, db: Session = Depends(get_db)):
+def delete_function(
+    function_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     service = FunctionService(db)
     success = service.delete_function(function_id)
     if not success:
@@ -88,6 +106,7 @@ async def invoke_function(
     request: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     exec_client: ExecutionClient = Depends(get_execution_client),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         service = ExecutionService(db, exec_client)  # DI로 주입
@@ -102,7 +121,11 @@ async def invoke_function(
 
 
 @router.get("/{function_id}/jobs")
-def get_function_jobs(function_id: int, db: Session = Depends(get_db)):
+def get_function_jobs(
+    function_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
         service = JobService(db)
         jobs = service.get_job_by_function_id(function_id)
@@ -116,7 +139,11 @@ def get_function_jobs(function_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{function_id}/metrics")
-def get_function_metrics(function_id: int, db: Session = Depends(get_db)):
+def get_function_metrics(
+    function_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
         service = FunctionService(db)
         metrics = service.get_function_metrics(function_id)
