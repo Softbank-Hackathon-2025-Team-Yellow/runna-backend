@@ -1,6 +1,7 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -25,9 +26,12 @@ class Function(Base):
     runtime = Column(Enum(Runtime), nullable=False)
     code = Column(Text, nullable=False)
     execution_type = Column(Enum(ExecutionType), nullable=False)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
     jobs = relationship("Job", back_populates="function")
+    workspace = relationship("Workspace", back_populates="functions")
