@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     worker_block_time_ms: int = 1000
     worker_timeout_seconds: int = 30
 
+    # Kubernetes 설정
+    kubernetes_in_cluster: bool = True  # Pod 내부 실행 여부
+    kubernetes_config_path: Optional[str] = None  # 로컬 개발용
+
+    # Namespace 리소스 제한
+    namespace_cpu_limit: str = "2000m"  # 2 core
+    namespace_memory_limit: str = "4Gi"  # 4GB
+    namespace_pod_limit: int = 10  # 최대 Pod 수
+
     @field_validator("secret_key", mode="before")
     @classmethod
     def generate_secret_key(cls, v):
