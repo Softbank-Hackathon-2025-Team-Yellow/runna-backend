@@ -39,6 +39,22 @@ class Settings(BaseSettings):
     worker_block_time_ms: int = 1000
     worker_timeout_seconds: int = 30
 
+    # K8s 설정
+    k8s_namespace_prefix: str = "runna"
+    k8s_docker_image: str = "docker.io/runna/python-runner:v1"
+    k8s_ingress_class: str = "nginx"
+    k8s_ingress_domain: str = "runna.dev"
+    
+    # K8s 리소스 제한
+    k8s_cpu_request: str = "100m"
+    k8s_memory_request: str = "128Mi"
+    k8s_cpu_limit: str = "500m"
+    k8s_memory_limit: str = "256Mi"
+    
+    # KNative 오토스케일링
+    knative_min_scale: str = "1"
+    knative_max_scale: str = "10"
+
     @field_validator("secret_key", mode="before")
     @classmethod
     def generate_secret_key(cls, v):
