@@ -3,13 +3,14 @@ import json
 from fastapi.testclient import TestClient
 
 
-def test_get_job_by_id(client: TestClient, mock_exec_client):
+def test_get_job_by_id(client: TestClient, mock_exec_client, test_workspace):
     # Create a function first
     function_data = {
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return {'result': 'success'}",
         "execution_type": "sync",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -55,13 +56,14 @@ def test_get_nonexistent_job(client: TestClient):
     assert "JOB_NOT_FOUND" in data["error"]["code"]
 
 
-def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client):
+def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client, test_workspace):
     # Create a function
     function_data = {
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
         "execution_type": "sync",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -89,13 +91,14 @@ def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client
     assert data["data"]["result"] is not None
 
 
-def test_async_job_creation(client: TestClient, mock_exec_client):
+def test_async_job_creation(client: TestClient, mock_exec_client, test_workspace):
     # Create an async function
     function_data = {
         "name": "test_async_function",
         "runtime": "python",
         "code": "def handler(event): return event",
         "execution_type": "async",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -120,13 +123,14 @@ def test_async_job_creation(client: TestClient, mock_exec_client):
     assert data["data"]["result"] is None
 
 
-def test_multiple_jobs_for_function(client: TestClient, mock_exec_client):
+def test_multiple_jobs_for_function(client: TestClient, mock_exec_client, test_workspace):
     # Create a function
     function_data = {
         "name": "test_function",
         "runtime": "python",
         "code": "def handler(event): return event",
         "execution_type": "sync",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
