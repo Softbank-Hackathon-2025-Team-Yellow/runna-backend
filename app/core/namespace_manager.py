@@ -40,8 +40,8 @@ class NamespaceManager:
         Function을 위한 namespace 생성
 
         Args:
-            workspace_name: Workspace 이름 (최대 20자, 검증됨)
-            function_id: Function UUID (36자)
+            workspace_name: Workspace 이름 (최대 20자, API/Model Layer에서 이미 검증됨)
+            function_id: Function UUID (36자, 시스템 생성으로 안전함)
 
         Returns:
             생성된 namespace 이름
@@ -50,18 +50,19 @@ class NamespaceManager:
             ValueError: namespace 이름이 63자 초과
             ApiException: Kubernetes API 호출 실패
         """
-        # 1. Namespace 이름 생성
+        # Namespace 이름 생성
         # 형식: {workspace_name}-{function_uuid}
         # 최대 길이: 20 + 1 + 36 = 57자 (63자 제한 안전)
         namespace = f"{workspace_name}-{function_id}"
 
-        # 2. 길이 검증 (Kubernetes 제약)
+        # 길이 검증만 수행 (Kubernetes 제약)
         if len(namespace) > 63:
+            logger.error(f"✗ Namespace name exceeds 63 characters: {namespace} ({len(namespace)})")
             raise ValueError(
                 f"Namespace name exceeds 63 characters: {namespace} ({len(namespace)})"
             )
 
-        # 3. Namespace 생성
+        # Namespace 생성
         namespace_body = client.V1Namespace(
             metadata=client.V1ObjectMeta(
                 name=namespace,
@@ -84,7 +85,7 @@ class NamespaceManager:
                 logger.error(f"✗ Failed to create namespace {namespace}: {e}")
                 raise
 
-        # 4. 리소스 제한 적용
+        # 리소스 제한 적용
         try:
             self._apply_resource_quota(namespace)
             self._apply_limit_range(namespace)
@@ -209,8 +210,8 @@ class NamespaceManager:
         Function namespace 삭제
 
         Args:
-            workspace_name: Workspace 이름
-            function_id: Function UUID
+            workspace_name: Workspace 이름 (이미 검증됨)
+            function_id: Function UUID (이미 검증됨)
         """
         namespace = f"{workspace_name}-{function_id}"
 
@@ -233,8 +234,8 @@ class NamespaceManager:
         Namespace 존재 여부 확인
 
         Args:
-            workspace_name: Workspace 이름
-            function_id: Function UUID
+            workspace_name: Workspace 이름 (이미 검증됨)
+            function_id: Function UUID (이미 검증됨)
 
         Returns:
             존재 여부

@@ -1,0 +1,213 @@
+"""
+Workspace 및 namespace 이름에 대한 Sanitization 및 검증 유틸리티
+
+Injection 공격에 대한 다층 방어를 제공하고 Kubernetes namespace 호환성을 보장합니다.
+"""
+import re
+from typing import Optional
+
+
+class SanitizationError(ValueError):
+    """Sanitization 또는 검증 실패 시 발생하는 예외"""
+    pass
+
+
+def sanitize_workspace_name(name: str, strict: bool = True) -> str:
+    """
+    Kubernetes namespace에서 안전하게 사용하기 위해 workspace 이름을 sanitize합니다.
+
+    이 함수는 다음을 통해 심층 방어를 제공합니다:
+    1. 잠재적으로 위험한 문자 제거
+    2. Kubernetes 네이밍 제약사항 강제
+    3. Injection 공격 방지
+
+    Args:
+        name: 사용자 입력으로부터 받은 원본 workspace 이름
+        strict: True면 유효하지 않은 입력에 대해 오류 발생, False면 수정 시도
+
+    Returns:
+        Sanitize된 workspace 이름
+
+    Raises:
+        SanitizationError: 이름이 유효하지 않고 strict=True인 경우
+
+    보안 고려사항:
+        - Shell metacharacter를 통한 command injection 방지
+        - Path traversal 시도 차단 (../)
+        - 잠재적 XSS 벡터 제거
+        - Kubernetes DNS-1123 label 표준 강제
+    """
+    if not name:
+        raise SanitizationError("Workspace 이름은 비어있을 수 없습니다")
+
+    # 앞뒤 공백 제거
+    name = name.strip()
+
+    if not name:
+        raise SanitizationError("Workspace 이름은 비어있거나 공백만으로 구성될 수 없습니다")
+
+    # Path traversal 시도 확인
+    if '..' in name or '/' in name or '\\' in name:
+        raise SanitizationError(
+            "Workspace 이름은 경로 탐색 문자(., /, \\)를 포함할 수 없습니다"
+        )
+
+    # Null byte 확인 (일반적인 injection 기술)
+    if '\0' in name or '\x00' in name:
+        raise SanitizationError("Workspace 이름은 null 바이트를 포함할 수 없습니다")
+
+    # 제어 문자 제거 (ASCII 0-31, 127)
+    if any(ord(c) < 32 or ord(c) == 127 for c in name):
+        if strict:
+            raise SanitizationError("Workspace 이름은 제어 문자를 포함할 수 없습니다")
+        else:
+            name = ''.join(c for c in name if ord(c) >= 32 and ord(c) != 127)
+
+    # 소문자로 변환 (Kubernetes 요구사항)
+    name = name.lower()
+
+    # Kubernetes DNS-1123 label 요구사항 확인
+    # 소문자 영숫자 문자 또는 '-'로만 구성되어야 함
+    if not re.match(r'^[a-z0-9-]+$', name):
+        if strict:
+            raise SanitizationError(
+                "Workspace 이름은 소문자, 숫자, 하이픈만 포함해야 합니다. "
+                f"유효하지 않은 문자가 포함됨: '{name}'"
+            )
+        else:
+            # 유효하지 않은 문자를 하이픈으로 교체
+            name = re.sub(r'[^a-z0-9-]', '-', name)
+            # 연속된 하이픈 제거
+            name = re.sub(r'-+', '-', name)
+
+    # 하이픈으로 시작하거나 끝나면 안됨
+    if name.startswith('-') or name.endswith('-'):
+        if strict:
+            raise SanitizationError("Workspace 이름은 하이픈으로 시작하거나 끝날 수 없습니다")
+        else:
+            name = name.strip('-')
+
+    # 길이 제약 (workspace 최대 20자 + UUID 36자 + 하이픈 1자 = 57 < 63)
+    if len(name) > 20:
+        raise SanitizationError(
+            f"Workspace 이름은 20자 이하여야 합니다 (현재 {len(name)}자). "
+            "이는 전체 Kubernetes namespace 이름이 63자 제한 내에 유지되도록 보장합니다."
+        )
+
+    if len(name) < 1:
+        raise SanitizationError("Sanitization 후 workspace 이름은 최소 1자 이상이어야 합니다")
+
+    # Kubernetes 예약 namespace 차단
+    reserved_names = {'default', 'kube-system', 'kube-public', 'kube-node-lease'}
+    if name in reserved_names:
+        raise SanitizationError(
+            f"Workspace 이름 '{name}'은(는) Kubernetes에 예약되어 있어 사용할 수 없습니다"
+        )
+
+    return name
+
+
+def validate_namespace_name(namespace: str) -> None:
+    """
+    Kubernetes namespace 생성 전 최종 검증을 수행합니다.
+
+    이것은 Kubernetes API를 호출하기 전 마지막 방어선입니다.
+    NamespaceManager에서 namespace 생성 직전에 호출되어야 합니다.
+
+    Args:
+        namespace: 전체 namespace 이름 (workspace-name + function-id)
+
+    Raises:
+        SanitizationError: namespace 이름이 유효하지 않은 경우
+
+    보안 고려사항:
+        - 전체 namespace 이름 검증 (workspace + function-id)
+        - Kubernetes 63자 제한을 초과하지 않도록 보장
+        - function_id 조작을 통한 namespace injection 방지
+    """
+    if not namespace:
+        raise SanitizationError("Namespace 이름은 비어있을 수 없습니다")
+
+    # Kubernetes namespace 길이 제한
+    if len(namespace) > 63:
+        raise SanitizationError(
+            f"Namespace 이름이 63자 제한을 초과합니다: '{namespace}' ({len(namespace)}자)"
+        )
+
+    # Kubernetes DNS-1123 label 형식과 일치해야 함
+    if not re.match(r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', namespace):
+        raise SanitizationError(
+            f"Namespace 이름 '{namespace}'이(가) Kubernetes DNS-1123 label 형식과 일치하지 않습니다. "
+            "영숫자로 시작하고 끝나야 하며, 소문자, 숫자, 하이픈만 포함해야 합니다."
+        )
+
+    # 추가 보안: 의심스러운 패턴 확인
+    # 연속된 하이픈은 injection 시도를 나타낼 수 있음
+    if '--' in namespace:
+        raise SanitizationError(
+            f"Namespace 이름 '{namespace}'에 연속된 하이픈이 포함되어 있어 의심스럽습니다"
+        )
+
+
+def sanitize_function_id(function_id: str) -> str:
+    """
+    Function UUID를 검증하고 sanitize합니다.
+
+    UUID는 내부적으로 생성되어 안전해야 하지만,
+    이 함수는 심층 방어를 위한 추가 검증 계층을 제공합니다.
+
+    Args:
+        function_id: Function UUID 문자열
+
+    Returns:
+        검증된 UUID 문자열
+
+    Raises:
+        SanitizationError: UUID 형식이 유효하지 않은 경우
+    """
+    if not function_id:
+        raise SanitizationError("Function ID는 비어있을 수 없습니다")
+
+    # UUID 형식: 8-4-4-4-12 16진수 문자
+    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+    function_id = function_id.lower().strip()
+
+    if not re.match(uuid_pattern, function_id):
+        raise SanitizationError(
+            f"Function ID '{function_id}'은(는) 유효한 UUID 형식이 아닙니다"
+        )
+
+    return function_id
+
+
+def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
+    """
+    Workspace와 function ID로부터 안전한 namespace 이름을 생성합니다.
+
+    모든 sanitization 단계를 적용하고 최종 namespace 이름을 생성하는
+    편의 함수입니다.
+
+    Args:
+        workspace_name: Workspace 이름 (sanitize됨)
+        function_id: Function UUID (검증됨)
+
+    Returns:
+        Kubernetes에 사용할 준비가 된 안전한 namespace 이름
+
+    Raises:
+        SanitizationError: 입력이 유효하지 않은 경우
+    """
+    # Workspace 이름 sanitize
+    safe_workspace = sanitize_workspace_name(workspace_name, strict=True)
+
+    # Function ID 검증
+    safe_function_id = sanitize_function_id(function_id)
+
+    # Namespace 이름 생성
+    namespace = f"{safe_workspace}-{safe_function_id}"
+
+    # 최종 검증
+    validate_namespace_name(namespace)
+
+    return namespace
