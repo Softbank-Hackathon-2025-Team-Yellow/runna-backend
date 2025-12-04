@@ -86,15 +86,18 @@ class NamespaceManager:
                 raise
 
         # 리소스 제한 적용
-        try:
-            self._apply_resource_quota(namespace)
-            self._apply_limit_range(namespace)
-            self._apply_network_policy(namespace)
-            logger.info(f"✓ Applied policies to namespace: {namespace}")
-        except Exception as e:
-            logger.error(f"✗ Failed to apply policies: {e}")
-            # Namespace는 생성되었으므로 계속 진행
+        # NOTE: 클러스터 측 Policy Controller가 자동으로 적용하므로 주석 처리
+        # 필요 시 아래 주석을 해제하여 수동 적용 가능
+        # try:
+        #     self._apply_resource_quota(namespace)
+        #     self._apply_limit_range(namespace)
+        #     self._apply_network_policy(namespace)
+        #     logger.info(f"✓ Applied policies to namespace: {namespace}")
+        # except Exception as e:
+        #     logger.error(f"✗ Failed to apply policies: {e}")
+        #     # Namespace는 생성되었으므로 계속 진행
 
+        logger.info(f"✓ Namespace created. Resource policies will be auto-applied by cluster.")
         return namespace
 
     def _apply_resource_quota(self, namespace: str):
