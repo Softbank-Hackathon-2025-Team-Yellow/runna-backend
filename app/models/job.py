@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     Text,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -25,7 +26,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True, index=True)
-    function_id = Column(Integer, ForeignKey("functions.id"), nullable=False)
+    function_id = Column(UUID(as_uuid=True), ForeignKey("functions.id"), nullable=False)
     status = Column(Enum(JobStatus), default=JobStatus.PENDING)
     result = Column(Text, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

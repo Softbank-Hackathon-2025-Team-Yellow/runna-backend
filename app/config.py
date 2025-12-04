@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     worker_timeout_seconds: int = 30
 
     # Kubernetes 설정
-    kubernetes_in_cluster: bool = True  # Pod 내부 실행 여부
+    kubernetes_in_cluster: bool = False  # Pod 내부 실행 여부 (기본값: Mock 사용)
     kubernetes_config_path: Optional[str] = None  # 로컬 개발용
 
     # Namespace 리소스 제한

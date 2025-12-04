@@ -34,14 +34,14 @@ class NamespaceManager:
     def create_function_namespace(
         self,
         workspace_name: str,
-        function_id: int
+        function_id: str
     ) -> str:
         """
         Function을 위한 namespace 생성
 
         Args:
             workspace_name: Workspace 이름 (최대 20자, 검증됨)
-            function_id: Function ID
+            function_id: Function UUID (36자)
 
         Returns:
             생성된 namespace 이름
@@ -51,7 +51,9 @@ class NamespaceManager:
             ApiException: Kubernetes API 호출 실패
         """
         # 1. Namespace 이름 생성
-        namespace = f"{workspace_name}-f-{function_id}"
+        # 형식: {workspace_name}-{function_uuid}
+        # 최대 길이: 20 + 1 + 36 = 57자 (63자 제한 안전)
+        namespace = f"{workspace_name}-{function_id}"
 
         # 2. 길이 검증 (Kubernetes 제약)
         if len(namespace) > 63:
@@ -66,7 +68,7 @@ class NamespaceManager:
                 labels={
                     "app": "runna",
                     "workspace": workspace_name,
-                    "function-id": str(function_id),
+                    "function-id": function_id,
                     "managed-by": "runna-backend"
                 }
             )
@@ -201,16 +203,16 @@ class NamespaceManager:
     def delete_function_namespace(
         self,
         workspace_name: str,
-        function_id: int
+        function_id: str
     ):
         """
         Function namespace 삭제
 
         Args:
             workspace_name: Workspace 이름
-            function_id: Function ID
+            function_id: Function UUID
         """
-        namespace = f"{workspace_name}-f-{function_id}"
+        namespace = f"{workspace_name}-{function_id}"
 
         try:
             self.core_v1.delete_namespace(name=namespace)
@@ -225,19 +227,19 @@ class NamespaceManager:
     def namespace_exists(
         self,
         workspace_name: str,
-        function_id: int
+        function_id: str
     ) -> bool:
         """
         Namespace 존재 여부 확인
 
         Args:
             workspace_name: Workspace 이름
-            function_id: Function ID
+            function_id: Function UUID
 
         Returns:
             존재 여부
         """
-        namespace = f"{workspace_name}-f-{function_id}"
+        namespace = f"{workspace_name}-{function_id}"
 
         try:
             self.core_v1.read_namespace(name=namespace)

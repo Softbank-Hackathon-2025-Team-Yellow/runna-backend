@@ -26,7 +26,7 @@ class FunctionUpdate(BaseModel):
 
 
 class FunctionResponse(FunctionBase):
-    id: int
+    id: uuid.UUID
     workspace_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -42,7 +42,7 @@ class CommonApiResponse(BaseModel):
 
 
 class FunctionCreateResponse(BaseModel):
-    function_id: int
+    function_id: uuid.UUID
 
 
 class InvokeFunctionRequest(BaseModel):
