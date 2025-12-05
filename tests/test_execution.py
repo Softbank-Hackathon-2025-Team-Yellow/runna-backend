@@ -5,9 +5,9 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client, test
     # Create a function first
     function_data = {
         "name": "test_sync_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return {'result': event.get('param1', 'default')}",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
     }
 
@@ -29,7 +29,7 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client, test
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["status"] == "success"  # JobStatus.SUCCESS
+    assert data["data"]["status"] == "SUCCESS"  # JobStatus.SUCCESS (uppercase)
     assert "job_id" in data["data"]
     assert data["data"]["function_id"] == function_id
 
@@ -38,9 +38,9 @@ def test_invoke_sync_function_failure(client: TestClient, mock_exec_client, test
     # Create a function first
     function_data = {
         "name": "test_sync_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
     }
 
@@ -61,7 +61,7 @@ def test_invoke_sync_function_failure(client: TestClient, mock_exec_client, test
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["status"] == "failed"
+    assert data["data"]["status"] == "FAILED"  # JobStatus.FAILED (uppercase)
     assert data["data"]["result"] is not None  # Error message stored
 
 
@@ -69,9 +69,9 @@ def test_invoke_async_function(client: TestClient, mock_exec_client, test_worksp
     # Create an async function
     function_data = {
         "name": "test_async_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "async",
+        "execution_type": "ASYNC",
         "workspace_id": str(test_workspace.id),
     }
 
@@ -90,7 +90,7 @@ def test_invoke_async_function(client: TestClient, mock_exec_client, test_worksp
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["status"] == "pending"
+    assert data["data"]["status"] == "PENDING"  # JobStatus.PENDING (uppercase)
     assert data["data"]["result"] is None
     assert "job_id" in data["data"]
 
@@ -99,9 +99,9 @@ def test_get_function_jobs(client: TestClient, mock_exec_client, test_workspace)
     # Create a function
     function_data = {
         "name": "test_function_jobs",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
     }
 
@@ -126,16 +126,16 @@ def test_get_function_jobs(client: TestClient, mock_exec_client, test_workspace)
     assert data["success"] is True
     assert len(data["data"]["jobs"]) == 1
     assert data["data"]["jobs"][0]["function_id"] == function_id
-    assert data["data"]["jobs"][0]["status"] == "success"  # JobStatus.SUCCESS
+    assert data["data"]["jobs"][0]["status"] == "SUCCESS"  # JobStatus.SUCCESS (uppercase)
 
 
 def test_get_job(client: TestClient, mock_exec_client, test_workspace):
     # Create a function
     function_data = {
         "name": "test_get_job",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
     }
 
@@ -160,4 +160,4 @@ def test_get_job(client: TestClient, mock_exec_client, test_workspace):
     data = response.json()
     assert data["success"] is True  # ✅ Standard response format
     assert data["data"]["job_id"] == job_id
-    assert data["data"]["status"] == "success"  # ✅ JobStatus.SUCCESS
+    assert data["data"]["status"] == "SUCCESS"  # ✅ JobStatus.SUCCESS (uppercase)

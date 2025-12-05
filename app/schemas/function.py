@@ -16,6 +16,7 @@ class FunctionBase(BaseModel):
 
 class FunctionCreate(FunctionBase):
     workspace_id: uuid.UUID
+    endpoint: Optional[str] = None  # 선택적, 없으면 name 기반으로 자동 생성
 
 
 class FunctionUpdate(BaseModel):
@@ -23,10 +24,12 @@ class FunctionUpdate(BaseModel):
     runtime: Optional[Runtime] = None
     code: Optional[str] = None
     execution_type: Optional[ExecutionType] = None
+    endpoint: Optional[str] = None  # endpoint 수정 가능
 
 
 class FunctionResponse(FunctionBase):
-    id: int
+    id: uuid.UUID
+    endpoint: str  # Function 호출 경로
     workspace_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -42,7 +45,7 @@ class CommonApiResponse(BaseModel):
 
 
 class FunctionCreateResponse(BaseModel):
-    function_id: int
+    function_id: uuid.UUID
 
 
 class InvokeFunctionRequest(BaseModel):

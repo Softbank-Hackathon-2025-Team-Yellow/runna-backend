@@ -5,6 +5,7 @@ from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.sanitize import sanitize_workspace_alias, SanitizationError
 from app.core.security import create_workspace_token
 from app.models.function import Function
 from app.models.workspace import Workspace
@@ -57,27 +58,45 @@ class WorkspaceService:
         """
         return self.db.query(Workspace).filter(Workspace.user_id == user_id).all()
 
+    def get_workspace_by_alias(self, alias: str) -> Optional[Workspace]:
+        """
+        alias로 워크스페이스 조회
+
+        Args:
+            alias: 워크스페이스 alias
+
+        Returns:
+            워크스페이스 객체 또는 None
+        """
+        return self.db.query(Workspace).filter(Workspace.alias == alias).first()
+
     def create_workspace(self, workspace_data: WorkspaceCreate, user_id: int) -> Workspace:
         """
         새 워크스페이스 생성
-        
+
         Args:
             workspace_data: 워크스페이스 생성 데이터
             user_id: 소유자 사용자 ID
-            
+
         Returns:
             생성된 워크스페이스 객체
-            
+
         Raises:
-            ValueError: 워크스페이스 이름이 이미 존재하는 경우
+            ValueError: 워크스페이스 이름이 이미 존재하거나 유효하지 않은 경우
+            SanitizationError: alias 생성 실패
         """
         # 이름 중복 검사
         existing_workspace = self.get_workspace_by_name(workspace_data.name)
         if existing_workspace:
             raise ValueError(f"Workspace with name '{workspace_data.name}' already exists")
 
+        # alias 자동 생성 (중복 시 suffix 자동 추가)
+        alias = sanitize_workspace_alias(workspace_data.name, db=self.db, max_attempts=10)
+
+        # Model Layer에서 검증됨 (@validates 데코레이터)
         db_workspace = Workspace(
             name=workspace_data.name,
+            alias=alias,
             user_id=user_id
         )
         self.db.add(db_workspace)
@@ -86,22 +105,22 @@ class WorkspaceService:
         return db_workspace
 
     def update_workspace(
-        self, 
-        workspace_id: uuid.UUID, 
-        workspace_data: WorkspaceUpdate, 
+        self,
+        workspace_id: uuid.UUID,
+        workspace_data: WorkspaceUpdate,
         user_id: int
     ) -> Optional[Workspace]:
         """
         워크스페이스 업데이트
-        
+
         Args:
             workspace_id: 워크스페이스 UUID
             workspace_data: 업데이트 데이터
             user_id: 요청한 사용자 ID
-            
+
         Returns:
             업데이트된 워크스페이스 객체 또는 None
-            
+
         Raises:
             ValueError: 이름 중복 또는 권한 없음
         """
@@ -118,6 +137,7 @@ class WorkspaceService:
             existing_workspace = self.get_workspace_by_name(workspace_data.name)
             if existing_workspace:
                 raise ValueError(f"Workspace with name '{workspace_data.name}' already exists")
+            # Model Layer에서 검증됨 (@validates 데코레이터)
             workspace.name = workspace_data.name
 
         self.db.commit()

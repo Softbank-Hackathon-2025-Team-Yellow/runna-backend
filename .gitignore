@@ -65,3 +65,4 @@ Architecture
 prd_docs/
 test.db
 
+k8s/

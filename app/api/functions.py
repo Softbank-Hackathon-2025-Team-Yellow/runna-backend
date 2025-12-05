@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
@@ -24,7 +25,7 @@ from app.services.workspace_service import WorkspaceService
 router = APIRouter()
 
 
-def _validate_function_access(db: Session, function_id: int, user_id: int) -> tuple[bool, Optional[Function], Optional[str]]:
+def _validate_function_access(db: Session, function_id: UUID, user_id: int) -> tuple[bool, Optional[Function], Optional[str]]:
     """
     Function에 대한 사용자 접근 권한 검증
     
@@ -90,13 +91,15 @@ def create_function(
         return create_success_response({"function_id": db_function.id})
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
-    except Exception:
-        return create_error_response("INTERNAL_ERROR", "Internal server error")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("INTERNAL_ERROR", f"Internal server error: {str(e)}")
 
 
 @router.put("/{function_id}")
 def update_function(
-    function_id: int,
+    function_id: UUID,
     function_update: FunctionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -122,7 +125,7 @@ def update_function(
 
 @router.get("/{function_id}")
 def get_function(
-    function_id: int,
+    function_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -137,7 +140,7 @@ def get_function(
 
 @router.delete("/{function_id}")
 def delete_function(
-    function_id: int,
+    function_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -157,7 +160,7 @@ def delete_function(
 
 @router.post("/{function_id}/invoke")
 async def invoke_function_with_user_auth(
-    function_id: int,
+    function_id: UUID,
     request: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     exec_client: ExecutionClient = Depends(get_execution_client),
@@ -182,7 +185,7 @@ async def invoke_function_with_user_auth(
 
 @router.post("/{function_id}/invoke/workspace")
 async def invoke_function_with_workspace_auth(
-    function_id: int,
+    function_id: UUID,
     request: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     exec_client: ExecutionClient = Depends(get_execution_client),
@@ -216,7 +219,7 @@ async def invoke_function_with_workspace_auth(
 
 @router.get("/{function_id}/jobs")
 def get_function_jobs(
-    function_id: int,
+    function_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -239,7 +242,7 @@ def get_function_jobs(
 
 @router.get("/{function_id}/metrics")
 def get_function_metrics(
-    function_id: int,
+    function_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

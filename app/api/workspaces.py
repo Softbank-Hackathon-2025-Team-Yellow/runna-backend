@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
+from app.core.sanitize import sanitize_workspace_name, SanitizationError
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -50,20 +51,26 @@ def create_workspace(
 ):
     """
     새 워크스페이스 생성
-    
+
     Args:
         workspace: 워크스페이스 생성 데이터
         db: 데이터베이스 세션
         current_user: 인증된 현재 사용자
-        
+
     Returns:
         생성된 워크스페이스 정보
     """
     try:
+        # API Layer: First line of defense - sanitize user input
+        sanitized_name = sanitize_workspace_name(workspace.name, strict=True)
+        workspace.name = sanitized_name
+
         service = WorkspaceService(db)
         db_workspace = service.create_workspace(workspace, current_user.id)
         workspace_response = WorkspaceResponse.model_validate(db_workspace)
         return create_success_response(workspace_response.model_dump())
+    except SanitizationError as e:
+        return create_error_response("SANITIZATION_ERROR", str(e))
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
     except Exception:
@@ -119,28 +126,35 @@ def update_workspace(
 ):
     """
     워크스페이스 업데이트
-    
+
     Args:
         workspace_id: 워크스페이스 UUID
         workspace_update: 업데이트 데이터
         db: 데이터베이스 세션
         current_user: 인증된 현재 사용자
-        
+
     Returns:
         업데이트된 워크스페이스 정보
     """
     try:
+        # API Layer: Sanitize workspace name if provided
+        if workspace_update.name:
+            sanitized_name = sanitize_workspace_name(workspace_update.name, strict=True)
+            workspace_update.name = sanitized_name
+
         service = WorkspaceService(db)
         workspace = service.update_workspace(workspace_id, workspace_update, current_user.id)
-        
+
         if not workspace:
             return create_error_response(
-                "WORKSPACE_NOT_FOUND", 
+                "WORKSPACE_NOT_FOUND",
                 f"Workspace with id {workspace_id} not found"
             )
 
         workspace_response = WorkspaceResponse.model_validate(workspace)
         return create_success_response(workspace_response.model_dump())
+    except SanitizationError as e:
+        return create_error_response("SANITIZATION_ERROR", str(e))
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
     except Exception:

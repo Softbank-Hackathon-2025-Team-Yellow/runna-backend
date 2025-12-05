@@ -82,7 +82,7 @@ def test_workspace(db_session, test_user):
     """
     workspace_service = WorkspaceService(db_session)
     unique_id = str(uuid.uuid4())[:8]
-    workspace_data = WorkspaceCreate(name=f"test_workspace_{unique_id}")
+    workspace_data = WorkspaceCreate(name=f"test-{unique_id}")  # 20자 제한: "test-" (5자) + uuid (8자) = 13자
     workspace = workspace_service.create_workspace(workspace_data, test_user.id)
     return workspace
 

@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     worker_block_time_ms: int = 1000
     worker_timeout_seconds: int = 30
 
+    # Kubernetes 설정
+    kubernetes_in_cluster: bool = False  # Pod 내부 실행 여부
+    kubernetes_config_path: Optional[str] = None  # 로컬 개발용
+
     # K8s 설정
     k8s_namespace_prefix: str = "runna"
     k8s_docker_image: str = "docker.io/runna/python-runner:v1"
@@ -46,6 +50,14 @@ class Settings(BaseSettings):
     k8s_memory_request: str = "128Mi"
     k8s_cpu_limit: str = "500m"
     k8s_memory_limit: str = "256Mi"
+
+    # Namespace 리소스 한도
+    namespace_cpu_limit: str = "2000m"
+    namespace_memory_limit: str = "4Gi"
+    namespace_pod_limit: int = 10
+
+    # 외부 Namespace Manager API
+    namespace_manager_url: Optional[str] = None
 
     # KNative 오토스케일링
     knative_min_scale: str = "1"
