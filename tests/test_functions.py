@@ -7,6 +7,7 @@ def test_create_function(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "def handler(event): return {'result': 'success'}",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     response = client.post("/functions/", json=function_data)
@@ -33,6 +34,7 @@ def test_get_functions_with_data(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -55,6 +57,7 @@ def test_get_function_by_id(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -71,7 +74,10 @@ def test_get_function_by_id(client: TestClient, test_workspace):
 
 
 def test_get_nonexistent_function(client: TestClient):
-    response = client.get("/functions/999")
+    import uuid
+    # UUID 형식으로 존재하지 않는 ID 생성
+    nonexistent_id = str(uuid.uuid4())
+    response = client.get(f"/functions/{nonexistent_id}")
     assert response.status_code == 200
 
     data = response.json()
@@ -87,6 +93,7 @@ def test_update_function(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -113,6 +120,7 @@ def test_delete_function(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -136,6 +144,7 @@ def test_create_function_with_invalid_code(client: TestClient, test_workspace):
         "runtime": "PYTHON",
         "code": "import os; os.system('rm -rf /')",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     response = client.post("/functions/", json=function_data)
@@ -153,6 +162,7 @@ def test_create_nodejs_function_with_syntax_error(client: TestClient, test_works
         "runtime": "NODEJS",
         "code": "function handler(event { return { message: 'Hello' }; }",  # Missing )
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     response = client.post("/functions/", json=function_data)
@@ -171,6 +181,7 @@ def test_create_nodejs_function_with_dangerous_module(client: TestClient, test_w
         "runtime": "NODEJS",
         "code": "const fs = require('fs'); function handler(e) { return fs.readFileSync('/etc/passwd'); }",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     response = client.post("/functions/", json=function_data)
@@ -189,6 +200,7 @@ def test_create_valid_nodejs_function(client: TestClient, test_workspace):
         "runtime": "NODEJS",
         "code": "function handler(event) { return { message: 'Hello World', data: event }; }",
         "execution_type": "SYNC",
+        "workspace_id": str(test_workspace.id),
     }
 
     response = client.post("/functions/", json=function_data)
