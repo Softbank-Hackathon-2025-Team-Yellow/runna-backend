@@ -1,4 +1,5 @@
 import logging
+
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
@@ -9,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class NamespaceManagerError(Exception):
     """NamespaceManager 관련 예외"""
+
     pass
 
 
@@ -31,16 +33,14 @@ class NamespaceManager:
                 config.load_kube_config(settings.kubernetes_config_path)  # 로컬
         except Exception as e:
             logger.error(f"Failed to load Kubernetes config: {e}")
-            raise NamespaceManagerError(f"Failed to initialize Kubernetes client: {e}") from e
+            raise NamespaceManagerError(
+                f"Failed to initialize Kubernetes client: {e}"
+            ) from e
 
         self.core_v1 = client.CoreV1Api()
         self.networking_v1 = client.NetworkingV1Api()
 
-    def create_function_namespace(
-        self,
-        workspace_name: str,
-        function_id: str
-    ) -> str:
+    def create_function_namespace(self, workspace_name: str, function_id: str) -> str:
         """
         Function을 위한 namespace 생성
 
@@ -62,7 +62,9 @@ class NamespaceManager:
 
         # 길이 검증만 수행 (Kubernetes 제약)
         if len(namespace) > 63:
-            logger.error(f"✗ Namespace name exceeds 63 characters: {namespace} ({len(namespace)})")
+            logger.error(
+                f"✗ Namespace name exceeds 63 characters: {namespace} ({len(namespace)})"
+            )
             raise ValueError(
                 f"Namespace name exceeds 63 characters: {namespace} ({len(namespace)})"
             )
@@ -75,8 +77,8 @@ class NamespaceManager:
                     "app": "runna",
                     "workspace": workspace_name,
                     "function-id": function_id,
-                    "managed-by": "runna-backend"
-                }
+                    "managed-by": "runna-backend",
+                },
             )
         )
 
@@ -102,7 +104,9 @@ class NamespaceManager:
         #     logger.error(f"✗ Failed to apply policies: {e}")
         #     # Namespace는 생성되었으므로 계속 진행
 
-        logger.info(f"✓ Namespace created. Resource policies will be auto-applied by cluster.")
+        logger.info(
+            "✓ Namespace created. Resource policies will be auto-applied by cluster."
+        )
         return namespace
 
     def _apply_resource_quota(self, namespace: str):
@@ -119,9 +123,9 @@ class NamespaceManager:
                     "requests.memory": settings.namespace_memory_limit,
                     "limits.cpu": settings.namespace_cpu_limit,
                     "limits.memory": settings.namespace_memory_limit,
-                    "pods": str(settings.namespace_pod_limit)
+                    "pods": str(settings.namespace_pod_limit),
                 }
-            )
+            ),
         )
 
         try:
@@ -144,21 +148,12 @@ class NamespaceManager:
                 limits=[
                     client.V1LimitRangeItem(
                         type="Container",
-                        default={
-                            "cpu": "500m",
-                            "memory": "512Mi"
-                        },
-                        default_request={
-                            "cpu": "100m",
-                            "memory": "128Mi"
-                        },
-                        max={
-                            "cpu": "1000m",
-                            "memory": "1Gi"
-                        }
+                        default={"cpu": "500m", "memory": "512Mi"},
+                        default_request={"cpu": "100m", "memory": "128Mi"},
+                        max={"cpu": "1000m", "memory": "1Gi"},
                     )
                 ]
-            )
+            ),
         )
 
         try:
@@ -194,26 +189,22 @@ class NamespaceManager:
                 ],
                 egress=[
                     # 모든 egress 허용 (외부 API 호출 등)
-                    client.V1NetworkPolicyEgressRule(
-                        to=[client.V1NetworkPolicyPeer()]
-                    )
-                ]
-            )
+                    client.V1NetworkPolicyEgressRule(to=[client.V1NetworkPolicyPeer()])
+                ],
+            ),
         )
 
         try:
-            self.networking_v1.create_namespaced_network_policy(namespace, network_policy)
+            self.networking_v1.create_namespaced_network_policy(
+                namespace, network_policy
+            )
         except ApiException as e:
             if e.status == 409:
                 logger.info(f"NetworkPolicy already exists in {namespace}")
             else:
                 raise
 
-    def delete_function_namespace(
-        self,
-        workspace_name: str,
-        function_id: str
-    ):
+    def delete_function_namespace(self, workspace_name: str, function_id: str):
         """
         Function namespace 삭제
 
@@ -233,11 +224,7 @@ class NamespaceManager:
                 logger.error(f"✗ Failed to delete namespace: {e}")
                 raise
 
-    def namespace_exists(
-        self,
-        workspace_name: str,
-        function_id: str
-    ) -> bool:
+    def namespace_exists(self, workspace_name: str, function_id: str) -> bool:
         """
         Namespace 존재 여부 확인
 

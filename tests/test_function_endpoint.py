@@ -3,12 +3,15 @@ Tests for Function endpoint functionality.
 
 Tests endpoint auto-generation, validation, and uniqueness.
 """
-import pytest
+
 from unittest.mock import MagicMock
+
+import pytest
+
 from app.core.sanitize import (
+    SanitizationError,
     sanitize_function_endpoint,
     validate_custom_endpoint,
-    SanitizationError
 )
 
 
@@ -73,7 +76,7 @@ class TestFunctionEndpointSanitization:
         # First query returns existing, second returns None
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_existing,  # First attempt: duplicate found
-            None            # Second attempt: no duplicate
+            None,  # Second attempt: no duplicate
         ]
 
         endpoint = sanitize_function_endpoint("myfunction", db=mock_db)
@@ -92,7 +95,7 @@ class TestFunctionEndpointSanitization:
             mock_existing1,  # /myfunction exists
             mock_existing2,  # /myfunction-2 exists
             mock_existing3,  # /myfunction-3 exists
-            None             # /myfunction-4 is free
+            None,  # /myfunction-4 is free
         ]
 
         endpoint = sanitize_function_endpoint("myfunction", db=mock_db, max_attempts=10)
@@ -104,9 +107,13 @@ class TestFunctionEndpointSanitization:
 
         # Always return existing function
         mock_existing = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_existing
+        mock_db.query.return_value.filter.return_value.first.return_value = (
+            mock_existing
+        )
 
-        with pytest.raises(SanitizationError, match="unique한 endpoint를 생성할 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="unique한 endpoint를 생성할 수 없습니다"
+        ):
             sanitize_function_endpoint("myfunction", db=mock_db, max_attempts=3)
 
     def test_slashes_in_name_handled(self):
@@ -175,7 +182,9 @@ class TestCustomEndpointValidation:
             "/MY-FUNCTION",  # uppercase
         ]
         for endpoint in invalid_endpoints:
-            with pytest.raises(SanitizationError, match="소문자, 숫자, 하이픈, 슬래시만"):
+            with pytest.raises(
+                SanitizationError, match="소문자, 숫자, 하이픈, 슬래시만"
+            ):
                 validate_custom_endpoint(endpoint)
 
     def test_consecutive_hyphens_rejected(self):
@@ -221,7 +230,7 @@ class TestFunctionEndpointIntegration:
 
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_existing,  # exists
-            None            # truncated version with suffix is free
+            None,  # truncated version with suffix is free
         ]
 
         endpoint = sanitize_function_endpoint(long_name, db=mock_db)
@@ -233,10 +242,15 @@ class TestFunctionEndpointIntegration:
     def test_complex_endpoint_scenarios(self):
         """Test complex real-world scenarios"""
         # Scenario 1: API versioning
-        assert sanitize_function_endpoint("API v1 User Handler") == "/api-v1-user-handler"
+        assert (
+            sanitize_function_endpoint("API v1 User Handler") == "/api-v1-user-handler"
+        )
 
         # Scenario 2: Event handlers
-        assert sanitize_function_endpoint("on_user_created_event") == "/on-user-created-event"
+        assert (
+            sanitize_function_endpoint("on_user_created_event")
+            == "/on-user-created-event"
+        )
 
         # Scenario 3: Microservice style
         assert sanitize_function_endpoint("auth.service.login") == "/auth-service-login"

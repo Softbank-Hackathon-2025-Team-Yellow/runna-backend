@@ -3,19 +3,19 @@ import json
 import logging
 import sys
 import uuid
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-sys.path.append('/home/ajy720/workspace/runna/backend')
+sys.path.append("/home/ajy720/workspace/runna/backend")
 
 from app.config import settings
 from app.database import SessionLocal
 from app.infra.async_redis_service import AsyncRedisService
-from app.models.job import JobStatus
-from app.schemas.message import Callback, ExecutionStatus
-from app.services.job_service import JobService
 
 # ORM 매핑을 위해 모든 모델 명시적 임포트
 from app.models import function, job  # noqa: F401
+from app.models.job import JobStatus
+from app.schemas.message import Callback, ExecutionStatus
+from app.services.job_service import JobService
 from worker.executor import DummyExecutor, ExecutionResult
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class Worker:
         self.redis_service = AsyncRedisService()
         self.executor = DummyExecutor()
         self.running = False
-        
+
         # 설정값들
         self.exec_stream_name = settings.exec_stream_name
         self.callback_channel_name = settings.callback_channel_name
@@ -38,15 +38,12 @@ class Worker:
     async def start(self):
         """워커 시작"""
         logger.info(f"Worker {self.worker_id} starting...")
-        
+
         # Consumer Group 생성 (이미 존재하면 무시)
         await self.redis_service.xgroup_create(
-            self.exec_stream_name, 
-            self.consumer_group_name, 
-            id="0", 
-            mkstream=True
+            self.exec_stream_name, self.consumer_group_name, id="0", mkstream=True
         )
-        
+
         self.running = True
         await self._consume_loop()
 
@@ -97,31 +94,25 @@ class Worker:
             await self._update_job_status(job_id, JobStatus.RUNNING)
 
             # 함수 실행
-            execution_result: ExecutionResult = await self.executor.execute(function_id, payload)
+            execution_result: ExecutionResult = await self.executor.execute(
+                function_id, payload
+            )
 
             if execution_result.success:
                 # 성공 시 처리
                 await self._update_job_status(
-                    job_id, 
-                    JobStatus.SUCCESS, 
-                    json.dumps(execution_result.result)
+                    job_id, JobStatus.SUCCESS, json.dumps(execution_result.result)
                 )
                 await self._publish_callback(
-                    job_id, 
-                    ExecutionStatus.SUCCESS, 
-                    execution_result.result
+                    job_id, ExecutionStatus.SUCCESS, execution_result.result
                 )
             else:
-                # 실패 시 처리  
+                # 실패 시 처리
                 await self._update_job_status(
-                    job_id, 
-                    JobStatus.FAILED, 
-                    execution_result.error
+                    job_id, JobStatus.FAILED, execution_result.error
                 )
                 await self._publish_callback(
-                    job_id, 
-                    ExecutionStatus.FAILED, 
-                    execution_result.error
+                    job_id, ExecutionStatus.FAILED, execution_result.error
                 )
 
         except Exception as e:
@@ -147,6 +138,7 @@ class Worker:
         result: Optional[str] = None,
     ):
         """Job 상태 업데이트"""
+
         def _sync_update():
             db = SessionLocal()
             try:

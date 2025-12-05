@@ -57,13 +57,18 @@ class ExecutionClient:
 
             # 결과 대기 (timeout 설정값 사용)
             try:
-                result = await asyncio.wait_for(waiter, timeout=settings.worker_timeout_seconds)
+                result = await asyncio.wait_for(
+                    waiter, timeout=settings.worker_timeout_seconds
+                )
                 return result
             except asyncio.TimeoutError:
                 # 타임아웃 시 Future 취소
                 if not waiter.done():
                     waiter.cancel()
-                return {"status": "failed", "result": f"Execution timeout ({settings.worker_timeout_seconds}s)"}
+                return {
+                    "status": "failed",
+                    "result": f"Execution timeout ({settings.worker_timeout_seconds}s)",
+                }
         finally:
             # Waiter 정리 - 완료되지 않은 Future 취소
             waiter = self.waiters.pop(job.id, None)
@@ -108,7 +113,7 @@ class ExecutionClient:
 
             return message_id is not None
 
-        except Exception as e:
+        except Exception:
             print(f"Execution Request Push Failed. (job: {job.id})")
             # 오류 발생 시 waiter 제거
             self.waiters.pop(job.id, None)
