@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.infra.execution_client import ExecutionClient
 from app.models.function import ExecutionType, Function
-from app.models.job import Job, JobStatus
+from app.models.job import Job, JobStatus, JobType
 from app.schemas.job import JobCreate
 
 
@@ -42,7 +42,11 @@ class ExecutionService:
         if not function:
             raise ValueError("Function not found")
 
-        _job = JobCreate(function_id=function.id, status=JobStatus.PENDING)
+        _job = JobCreate(
+            function_id=function_id, 
+            status=JobStatus.PENDING,
+            job_type=JobType.EXECUTION
+        )
 
         job = Job(**_job.model_dump())
 

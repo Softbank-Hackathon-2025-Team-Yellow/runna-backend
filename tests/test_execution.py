@@ -11,6 +11,7 @@ def test_invoke_sync_function_success(
         "code": "def handler(event): return {'result': event.get('param1', 'default')}",
         "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-endpoint"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -46,6 +47,7 @@ def test_invoke_sync_function_failure(
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-sync-fail"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -77,9 +79,12 @@ def test_invoke_async_function(client: TestClient, mock_exec_client, test_worksp
         "code": "def handler(event): return event",
         "execution_type": "ASYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-async"
     }
 
     create_response = client.post("/functions/", json=function_data)
+    print(f"Create Response Status: {create_response.status_code}")
+    print(f"Create Response Body: {create_response.text}")
     assert create_response.status_code == 200
     function_id = create_response.json()["data"]["function_id"]
 
@@ -107,6 +112,7 @@ def test_get_function_jobs(client: TestClient, mock_exec_client, test_workspace)
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-jobs"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -143,6 +149,7 @@ def test_get_job(client: TestClient, mock_exec_client, test_workspace):
         "code": "def handler(event): return event",
         "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-get-job"
     }
 
     create_response = client.post("/functions/", json=function_data)
