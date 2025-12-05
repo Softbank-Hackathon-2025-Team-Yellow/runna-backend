@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -122,7 +123,7 @@ class FunctionService:
 
         return db_function
 
-    def get_function(self, function_id: int) -> Optional[Function]:
+    def get_function(self, function_id: UUID) -> Optional[Function]:
         return self.db.query(Function).filter(Function.id == function_id).first()
 
     def get_function_by_name(self, name: str) -> Optional[Function]:
@@ -132,7 +133,7 @@ class FunctionService:
         return self.db.query(Function).offset(skip).limit(limit).all()
 
     def update_function(
-        self, function_id: int, function_update: FunctionUpdate
+        self, function_id: UUID, function_update: FunctionUpdate
     ) -> Optional[Function]:
         db_function = self.get_function(function_id)
         if not db_function:
@@ -171,7 +172,7 @@ class FunctionService:
         self.db.refresh(db_function)
         return db_function
 
-    def delete_function(self, function_id: int) -> bool:
+    def delete_function(self, function_id: UUID) -> bool:
         db_function = self.get_function(function_id)
         if not db_function:
             return False
@@ -210,7 +211,7 @@ class FunctionService:
         self.db.commit()
         return True
 
-    def get_function_metrics(self, function_id: int) -> Optional[Dict[str, Any]]:
+    def get_function_metrics(self, function_id: UUID) -> Optional[Dict[str, Any]]:
         function = self.get_function(function_id)
         if not function:
             return None
@@ -246,7 +247,7 @@ class FunctionService:
 
     def deploy_function_to_k8s(
         self,
-        function_id: int,
+        function_id: UUID,
         custom_path: str,
         env_vars: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
@@ -284,7 +285,7 @@ class FunctionService:
             env_vars=env_vars,
         )
 
-    def get_function_deployment_status(self, function_id: int) -> Optional[Dict]:
+    def get_function_deployment_status(self, function_id: UUID) -> Optional[Dict]:
         """
         함수 배포 상태 확인
 

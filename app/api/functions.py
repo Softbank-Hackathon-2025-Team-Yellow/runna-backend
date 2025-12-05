@@ -270,22 +270,20 @@ def get_function_metrics(
 @router.post("/{function_id}/deploy")
 async def deploy_function(
     function_id: UUID,
-    background_tasks: BackgroundTasks,
     deploy_request: FunctionDeployRequest = Body(default=FunctionDeployRequest()),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Function을 K8s 클러스터에 비동기로 배포 (Future 기반)
-    
+
     - Job을 생성하고 즉시 job_id 반환
-    - 백그라운드에서 배포 실행
+    - 백그라운드에서 배포 실행 (asyncio.create_task)
     - GET /jobs/{job_id} 또는 GET /functions/{function_id}/deployment로 상태 조회
 
     Args:
         function_id: 배포할 Function ID
         deploy_request: 배포 요청 (환경변수 등)
-        background_tasks: FastAPI BackgroundTasks
 
     Returns:
         Job ID와 PENDING 상태
@@ -366,14 +364,15 @@ async def deploy_function(
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         deployment_client.deployment_futures[job.id] = future
-        
-        # 9. 백그라운드 작업 시작
-        background_tasks.add_task(
-            deployment_client.deploy_async,
-            job.id,  # job 객체 대신 ID 전달
-            function_id,
-            custom_path,
-            deploy_request.env_vars
+
+        # 9. 백그라운드 작업 시작 (asyncio.create_task 사용)
+        asyncio.create_task(
+            deployment_client.deploy_async(
+                job_id=job.id,
+                function_id=function_id,
+                custom_path=custom_path,
+                env_vars=deploy_request.env_vars
+            )
         )
         
         # 10. 즉시 응답

@@ -10,6 +10,7 @@ from app.models.job import JobStatus, JobType
 class JobBase(BaseModel):
     function_id: uuid.UUID
     status: JobStatus
+    job_type: JobType = JobType.EXECUTION
 
 
 class JobCreate(JobBase):

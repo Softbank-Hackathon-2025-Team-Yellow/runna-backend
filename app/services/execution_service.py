@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -23,7 +24,7 @@ class ExecutionService:
         self.exec_client = exec_client if exec_client is not None else ExecutionClient()
 
     async def execute_function(
-        self, function_id: int, input_data: Dict[str, Any]
+        self, function_id: UUID, input_data: Dict[str, Any]
     ) -> Job:
         """
         ✅ Implemented: 함수를 실행합니다.
