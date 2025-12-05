@@ -279,3 +279,258 @@ class K8sClient:
                 f"Failed to get KNative Service {service_name} status: {e.reason}"
             )
             return None
+
+    def create_cluster_domain_claim(self, domain: str, namespace: str) -> str:
+        """
+        ClusterDomainClaim 생성
+
+        Args:
+            domain: 클레임할 도메인 (예: workspace-alias.runna.haifu.cloud)
+            namespace: 도메인을 사용할 네임스페이스
+
+        Returns:
+            생성된 ClusterDomainClaim 이름
+
+        Raises:
+            K8sClientError: 생성 실패 시
+        """
+
+        manifest = {
+            "apiVersion": "networking.internal.knative.dev/v1alpha1",
+            "kind": "ClusterDomainClaim",
+            "metadata": {"name": domain},
+            "spec": {"namespace": namespace},
+        }
+
+        try:
+            response = self.custom_objects.create_cluster_custom_object(
+                group="networking.internal.knative.dev",
+                version="v1alpha1",
+                plural="clusterdomainclaims",
+                body=manifest,
+            )
+
+            logger.info(f"✅ ClusterDomainClaim {domain} created successfully")
+            return domain
+
+        except ApiException as e:
+            if e.status == 409:
+                logger.info(f"ClusterDomainClaim {domain} already exists")
+                return domain
+            error_msg = f"Failed to create ClusterDomainClaim: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)
+
+    def delete_cluster_domain_claim(self, claim_name: str) -> bool:
+        """
+        ClusterDomainClaim 삭제
+
+        Args:
+            claim_name: 삭제할 클레임 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        try:
+            self.custom_objects.delete_cluster_custom_object(
+                group="networking.internal.knative.dev",
+                version="v1alpha1",
+                plural="clusterdomainclaims",
+                name=claim_name,
+            )
+            logger.info(f"✅ ClusterDomainClaim {claim_name} deleted successfully")
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning(
+                    f"ClusterDomainClaim {claim_name} already deleted or does not exist"
+                )
+                return True
+            error_msg = f"Failed to delete ClusterDomainClaim {claim_name}: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)
+
+    def create_domain_mapping(
+        self, namespace: str, domain: str, service_name: str
+    ) -> str:
+        """
+        DomainMapping 생성 (KNative Service와 도메인 연결)
+
+        Args:
+            namespace: DomainMapping이 생성될 네임스페이스
+            domain: 매핑할 도메인
+            service_name: 연결할 KNative Service 이름
+
+        Returns:
+            생성된 DomainMapping 이름
+
+        Raises:
+            K8sClientError: 생성 실패 시
+        """
+
+        manifest = {
+            "apiVersion": "serving.knative.dev/v1alpha1",
+            "kind": "DomainMapping",
+            "metadata": {"name": domain, "namespace": namespace},
+            "spec": {
+                "ref": {
+                    "name": service_name,
+                    "kind": "Service",
+                    "apiVersion": "serving.knative.dev/v1",
+                }
+            },
+        }
+
+        try:
+            response = self.custom_objects.create_namespaced_custom_object(
+                group="serving.knative.dev",
+                version="v1alpha1",
+                namespace=namespace,
+                plural="domainmappings",
+                body=manifest,
+            )
+
+            logger.info(f"✅ DomainMapping {domain} created successfully")
+            return domain
+
+        except ApiException as e:
+            if e.status == 409:
+                logger.info(f"DomainMapping {domain} already exists")
+                return domain
+            error_msg = f"Failed to create DomainMapping: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)
+
+    def delete_domain_mapping(self, namespace: str, mapping_name: str) -> bool:
+        """
+        DomainMapping 삭제
+
+        Args:
+            namespace: DomainMapping이 위치한 네임스페이스
+            mapping_name: 삭제할 DomainMapping 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        try:
+            self.custom_objects.delete_namespaced_custom_object(
+                group="serving.knative.dev",
+                version="v1alpha1",
+                namespace=namespace,
+                plural="domainmappings",
+                name=mapping_name,
+            )
+            logger.info(f"✅ DomainMapping {mapping_name} deleted successfully")
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning(
+                    f"DomainMapping {mapping_name} already deleted or does not exist"
+                )
+                return True
+            error_msg = f"Failed to delete DomainMapping {mapping_name}: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)
+
+    def create_http_route(
+        self,
+        namespace: str,
+        hostname: str,
+        path: str,
+        service_name: str,
+        gateway_name: str = "3scale-kourier-gateway",
+        gateway_namespace: str = "istio-system",
+    ) -> str:
+        """
+        Gateway API HTTPRoute 생성
+
+        Args:
+            namespace: HTTPRoute가 생성될 네임스페이스
+            hostname: 라우팅할 호스트명 (예: workspace-alias.runna.haifu.cloud)
+            path: 라우팅할 경로 (예: /my-function)
+            service_name: 백엔드 KNative Service 이름
+            gateway_name: Gateway 이름
+            gateway_namespace: Gateway가 위치한 네임스페이스
+
+        Returns:
+            생성된 HTTPRoute 이름
+
+        Raises:
+            K8sClientError: 생성 실패 시
+        """
+        route_name = f"{service_name}-route"
+
+        manifest = {
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "HTTPRoute",
+            "metadata": {"name": route_name, "namespace": namespace},
+            "spec": {
+                "parentRefs": [{"name": gateway_name}],
+                "hostnames": [hostname],
+                "rules": [
+                    {
+                        "matches": [{"path": {"type": "PathPrefix", "value": path}}],
+                        "backendRefs": [
+                            {
+                                "name": service_name,
+                                "port": 80,
+                                "kind": "Service",
+                                "group": "serving.knative.dev",
+                                "weight": 100,
+                            }
+                        ],
+                    }
+                ],
+            },
+        }
+
+        try:
+            response = self.custom_objects.create_namespaced_custom_object(
+                group="gateway.networking.k8s.io",
+                version="v1",
+                namespace=namespace,
+                plural="httproutes",
+                body=manifest,
+            )
+
+            logger.info(f"✅ HTTPRoute {route_name} created successfully")
+            return route_name
+
+        except ApiException as e:
+            if e.status == 409:
+                logger.info(f"HTTPRoute {route_name} already exists")
+                return route_name
+            error_msg = f"Failed to create HTTPRoute: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)
+
+    def delete_http_route(self, namespace: str, route_name: str) -> bool:
+        """
+        HTTPRoute 삭제
+
+        Args:
+            namespace: HTTPRoute가 위치한 네임스페이스
+            route_name: 삭제할 HTTPRoute 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        try:
+            self.custom_objects.delete_namespaced_custom_object(
+                group="gateway.networking.k8s.io",
+                version="v1",
+                namespace=namespace,
+                plural="httproutes",
+                name=route_name,
+            )
+            logger.info(f"✅ HTTPRoute {route_name} deleted successfully")
+            return True
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning(
+                    f"HTTPRoute {route_name} already deleted or does not exist"
+                )
+                return True
+            error_msg = f"Failed to delete HTTPRoute {route_name}: {e.reason}"
+            logger.error(error_msg)
+            raise K8sClientError(error_msg)

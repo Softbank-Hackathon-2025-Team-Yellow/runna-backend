@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.k8s_client import K8sClient, K8sClientError
+from app.core.sanitize import create_safe_namespace_name
 from app.models.function import Function
 from app.models.workspace import Workspace
 
@@ -42,7 +43,6 @@ class K8sService:
         self,
         function: Function,
         workspace: Workspace,
-        custom_path: str,
         env_vars: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
         """
@@ -51,23 +51,23 @@ class K8sService:
         Args:
             function: 배포할 함수 객체
             workspace: 워크스페이스 객체
-            custom_path: 사용자 정의 경로
             env_vars: 추가 환경변수 (선택사항)
 
         Returns:
-            배포 결과 정보 (namespace, service_name, ingress_url)
+            배포 결과 정보 (namespace, service_name, function_url)
 
         Raises:
             K8sServiceError: 배포 중 오류 발생 시
         """
         try:
             # 1. Namespace 생성
-            namespace_name = self._generate_namespace_name(
-                workspace.name, str(function.id)
+            namespace_name = create_safe_namespace_name(
+                workspace.alias, str(function.id)
             )
+
             namespace_labels = {
                 "app": "runna",
-                "workspace": workspace.name,
+                "workspace": workspace.alias,
                 "function-id": str(function.id),
             }
 
@@ -86,30 +86,43 @@ class K8sService:
                 namespace=namespace, manifest=knative_manifest
             )
 
-            # 3. Ingress 생성
-            ingress_manifest = self._build_ingress_manifest(
-                workspace_name=workspace.name,
-                custom_path=custom_path,
-                service_name=service_name,
+            # 3. ClusterDomainClaim 생성
+            subdomain = self._generate_subdomain(workspace.alias)
+            claim_name = self.k8s_client.create_cluster_domain_claim(
+                domain=subdomain, namespace=namespace
+            )
+
+            # 4. DomainMapping 생성
+            domain_mapping_name = self.k8s_client.create_domain_mapping(
                 namespace=namespace,
+                domain=subdomain,
+                service_name=service_name,
             )
 
-            ingress_name = self.k8s_client.create_ingress(
-                namespace=namespace, manifest=ingress_manifest
+            # 5. HTTPRoute 생성 (Gateway API)
+            http_route_name = self.k8s_client.create_http_route(
+                namespace=namespace,
+                hostname=subdomain,
+                path=function.endpoint,
+                service_name=service_name,
+                gateway_name=settings.gateway_name,
+                gateway_namespace=settings.gateway_namespace,
             )
 
-            # 4. URL 생성
-            ingress_url = self._generate_ingress_url(workspace.name, custom_path)
+            # 6. 최종 URL 생성
+            function_url = self._generate_function_url(workspace.alias, function.endpoint)
 
             result = {
                 "namespace": namespace,
                 "service_name": service_name,
-                "ingress_name": ingress_name,
-                "ingress_url": ingress_url,
+                "cluster_domain_claim": claim_name,
+                "domain_mapping": domain_mapping_name,
+                "http_route": http_route_name,
+                "function_url": function_url,
             }
 
             logger.info(
-                f"🚀 Function {function.name} deployed successfully: {ingress_url}"
+                f"🚀 Function {function.name} deployed successfully: {function_url}"
             )
             return result
 
@@ -131,18 +144,33 @@ class K8sService:
         Returns:
             정리 성공 여부
         """
-        namespace_name = self._generate_namespace_name(workspace.name, str(function.id))
+        namespace_name = create_safe_namespace_name(workspace.alias, str(function.id))
+        subdomain = self._generate_subdomain(workspace.alias)
 
         try:
-            # Namespace 삭제 (관련된 모든 리소스가 함께 삭제됨)
-            success = self.k8s_client.delete_namespace(namespace_name)
+            cleanup_success = True
+            
+            # 1. ClusterDomainClaim 삭제 (클러스터 수준 리소스)
+            try:
+                self.k8s_client.delete_cluster_domain_claim(subdomain)
+            except Exception as e:
+                logger.warning(f"Failed to delete ClusterDomainClaim: {e}")
+                cleanup_success = False
 
-            if success:
+            # 2. Namespace 삭제 (네임스페이스 내 모든 리소스가 함께 삭제됨)
+            # - DomainMapping, HTTPRoute, KNative Service 등이 모두 삭제됨
+            namespace_success = self.k8s_client.delete_namespace(namespace_name)
+
+            if namespace_success and cleanup_success:
                 logger.info(
                     f"🧹 Function {function.name} resources cleaned up successfully"
                 )
-
-            return success
+                return True
+            else:
+                logger.warning(
+                    f"Function {function.name} cleanup completed with some warnings"
+                )
+                return False
 
         except Exception as e:
             logger.error(
@@ -163,20 +191,20 @@ class K8sService:
         Returns:
             함수 상태 정보 또는 None
         """
-        namespace_name = self._generate_namespace_name(workspace.name, str(function.id))
+        namespace_name = create_safe_namespace_name(workspace.alias, str(function.id))
 
         return self.k8s_client.get_knative_service_status(
             namespace=namespace_name, service_name=function.name
         )
 
-    def _generate_namespace_name(self, workspace_name: str, function_id: str) -> str:
-        """Namespace 이름 생성"""
-        return f"{settings.k8s_namespace_prefix}-{workspace_name}-{function_id}"
+    def _generate_subdomain(self, workspace_alias: str) -> str:
+        """서브도메인 생성"""
+        return f"{workspace_alias}.{settings.base_domain}"
 
-    def _generate_ingress_url(self, workspace_name: str, custom_path: str) -> str:
-        """Ingress URL 생성"""
-        subdomain = f"{workspace_name}.{settings.k8s_ingress_domain}"
-        return f"https://{subdomain}{custom_path}"
+    def _generate_function_url(self, workspace_alias: str, endpoint: str) -> str:
+        """함수 최종 URL 생성"""
+        subdomain = self._generate_subdomain(workspace_alias)
+        return f"https://{subdomain}{endpoint}"
 
     def _build_knative_manifest(
         self,
@@ -187,8 +215,19 @@ class K8sService:
         """KNative Service 매니페스트 생성"""
         revision_name = f"{function.name}-{uuid.uuid4().hex[:8]}"
 
+        # Runtime별 Docker 이미지 선택
+        if function.runtime == "PYTHON":
+            docker_image = settings.k8s_python_image
+        elif function.runtime == "NODEJS":
+            docker_image = settings.k8s_nodejs_image
+        else:
+            raise K8sServiceError(f"Unsupported runtime: {function.runtime}")
+
         # 환경변수 설정
-        env_list = [{"name": "CODE_CONTENT", "value": function.code}]
+        env_list = [
+            {"name": "CODE_CONTENT", "value": function.code},
+            {"name": "RUNTIME", "value": function.runtime}
+        ]
         if env_vars:
             env_list.extend([{"name": k, "value": v} for k, v in env_vars.items()])
 
@@ -200,8 +239,8 @@ class K8sService:
                 "namespace": namespace,
                 "labels": {
                     "app": "runna",
+                    "workspace": function.workspace.alias,
                     "function": function.name,
-                    "function-id": str(function.id),
                 },
             },
             "spec": {
@@ -221,7 +260,7 @@ class K8sService:
                         "containers": [
                             {
                                 "name": "user-container",
-                                "image": settings.k8s_docker_image,
+                                "image": docker_image,
                                 "resources": {
                                     "requests": {
                                         "cpu": settings.k8s_cpu_request,
@@ -240,56 +279,3 @@ class K8sService:
             },
         }
 
-    def _build_ingress_manifest(
-        self,
-        workspace_name: str,
-        custom_path: str,
-        service_name: str,
-        namespace: str,
-    ) -> client.V1Ingress:
-        """Ingress 매니페스트 생성"""
-        subdomain = f"{workspace_name}.{settings.k8s_ingress_domain}"
-        ingress_name = f"{service_name}-ingress"
-
-        return client.V1Ingress(
-            metadata=client.V1ObjectMeta(
-                name=ingress_name,
-                namespace=namespace,
-                labels={
-                    "app": "runna",
-                    "workspace": workspace_name,
-                },
-                annotations={
-                    "kubernetes.io/ingress.class": settings.k8s_ingress_class,
-                    "nginx.ingress.kubernetes.io/rewrite-target": "/",
-                    "cert-manager.io/cluster-issuer": "letsencrypt-prod",
-                },
-            ),
-            spec=client.V1IngressSpec(
-                tls=[
-                    client.V1IngressTLS(
-                        hosts=[subdomain],
-                        secret_name=f"{workspace_name}-tls",
-                    )
-                ],
-                rules=[
-                    client.V1IngressRule(
-                        host=subdomain,
-                        http=client.V1HTTPIngressRuleValue(
-                            paths=[
-                                client.V1HTTPIngressPath(
-                                    path=custom_path,
-                                    path_type="Prefix",
-                                    backend=client.V1IngressBackend(
-                                        service=client.V1IngressServiceBackend(
-                                            name=service_name,
-                                            port=client.V1ServiceBackendPort(number=80),
-                                        )
-                                    ),
-                                )
-                            ]
-                        ),
-                    )
-                ],
-            ),
-        )
