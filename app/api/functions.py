@@ -15,6 +15,8 @@ from app.schemas.function import (
     FunctionCreate,
     FunctionResponse,
     FunctionUpdate,
+    FunctionDeployRequest,
+    FunctionDeployResponse,
 )
 from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
@@ -251,7 +253,7 @@ def get_function_metrics(
         has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
         if not has_access:
             return create_error_response("ACCESS_DENIED", error_msg)
-        
+
         service = FunctionService(db)
         metrics = service.get_function_metrics(function_id)
         if metrics is None:
@@ -261,3 +263,113 @@ def get_function_metrics(
         return create_success_response(metrics)
     except Exception:
         return create_error_response("INTERNAL_ERROR", "Internal server error")
+
+
+@router.post("/{function_id}/deploy")
+def deploy_function(
+    function_id: UUID,
+    deploy_request: FunctionDeployRequest = Body(default=FunctionDeployRequest()),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Function을 K8s 클러스터에 배포
+
+    - 코드 존재 및 유효성 검증
+    - 코드 정적 분석 재수행 (보안)
+    - Runtime 검증 (PYTHON/NODEJS만 지원)
+    - KNative Service로 배포
+    - Runtime에 따른 적절한 Docker image 사용
+    - Ingress 자동 생성 및 Public URL 반환
+
+    Args:
+        function_id: 배포할 Function ID
+        deploy_request: 배포 요청 (환경변수 등)
+
+    Returns:
+        배포 결과 (namespace, service_name, ingress_url)
+
+    Raises:
+        VALIDATION_ERROR: 코드가 비어있거나 정적 분석 실패
+        ACCESS_DENIED: 권한 없음
+        WORKSPACE_NOT_FOUND: Workspace 없음
+        DEPLOYMENT_FAILED: 배포 실패
+    """
+    try:
+        # 1. Function 조회 및 권한 검증
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
+        if not has_access:
+            return create_error_response("ACCESS_DENIED", error_msg)
+
+        # 2. Workspace 조회
+        workspace_service = WorkspaceService(db)
+        workspace = workspace_service.get_workspace_by_id(function.workspace_id)
+
+        if not workspace:
+            return create_error_response(
+                "WORKSPACE_NOT_FOUND",
+                f"Workspace with id {function.workspace_id} not found"
+            )
+
+        # 3. 코드 존재 확인
+        if not function.code or not function.code.strip():
+            return create_error_response(
+                "VALIDATION_ERROR",
+                "Function code is empty. Cannot deploy without code."
+            )
+
+        # 4. Runtime 유효성 확인
+        from app.models.function import Runtime
+        if function.runtime not in [Runtime.PYTHON, Runtime.NODEJS]:
+            return create_error_response(
+                "VALIDATION_ERROR",
+                f"Unsupported runtime: {function.runtime}. Only PYTHON and NODEJS are supported."
+            )
+
+        # 5. 코드 정적 분석 재수행 (보안 검증)
+        from app.core.static_analysis import analyzer
+
+        if function.runtime == Runtime.PYTHON:
+            analysis_result = analyzer.analyze_python_code(function.code)
+        elif function.runtime == Runtime.NODEJS:
+            analysis_result = analyzer.analyze_nodejs_code(function.code)
+        else:
+            analysis_result = {"is_safe": False, "violations": ["Unsupported runtime"]}
+
+        if not analysis_result["is_safe"]:
+            return create_error_response(
+                "VALIDATION_ERROR",
+                f"Code validation failed: {', '.join(analysis_result['violations'])}"
+            )
+
+        # 6. Custom path 설정 (endpoint 사용)
+        custom_path = function.endpoint  # "/hello" → ingress path
+
+        # 7. 배포 실행
+        function_service = FunctionService(db)
+        deploy_result = function_service.deploy_function_to_k8s(
+            function_id=function_id,
+            custom_path=custom_path,
+            env_vars=deploy_request.env_vars
+        )
+
+        # 8. 응답 생성
+        response = FunctionDeployResponse(
+            function_id=function.id,
+            function_name=function.name,
+            runtime=function.runtime,
+            namespace=deploy_result["namespace"],
+            service_name=deploy_result["service_name"],
+            ingress_url=deploy_result["ingress_url"]
+        )
+
+        return create_success_response(response.model_dump())
+
+    except ValueError as e:
+        return create_error_response("VALIDATION_ERROR", str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("DEPLOYMENT_FAILED", f"Failed to deploy function: {str(e)}")

@@ -55,3 +55,40 @@ class InvokeFunctionRequest(BaseModel):
     def to_dict(self) -> dict:
         """Convert request to dictionary for function execution"""
         return {k: v for k, v in self.model_dump().items() if v is not None}
+
+
+class FunctionDeployRequest(BaseModel):
+    """Function 배포 요청"""
+    env_vars: Optional[dict] = None  # 추가 환경변수 (선택사항)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "env_vars": {
+                    "API_KEY": "secret-key",
+                    "ENVIRONMENT": "production"
+                }
+            }
+        }
+
+
+class FunctionDeployResponse(BaseModel):
+    """Function 배포 결과"""
+    function_id: uuid.UUID
+    function_name: str
+    runtime: Runtime
+    namespace: str
+    service_name: str
+    ingress_url: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "function_id": "550e8400-e29b-41d4-a716-446655440000",
+                "function_name": "hello-world",
+                "runtime": "PYTHON",
+                "namespace": "my-api-550e8400-e29b-41d4-a716-446655440000",
+                "service_name": "hello-world",
+                "ingress_url": "https://my-api.runna.dev/hello-world"
+            }
+        }

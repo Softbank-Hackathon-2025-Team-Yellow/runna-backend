@@ -41,7 +41,12 @@ class Settings(BaseSettings):
 
     # K8s 설정
     k8s_namespace_prefix: str = "runna"
-    k8s_docker_image: str = "docker.io/runna/python-runner:v1"
+    k8s_docker_image: str = "docker.io/runna/python-runner:v1"  # Deprecated (하위 호환성)
+
+    # Runtime별 Docker Image 매핑
+    k8s_python_image: str = "sbyellow/python-runner:v1"
+    k8s_nodejs_image: str = "sbyellow/node-runner:v1"
+
     k8s_ingress_class: str = "nginx"
     k8s_ingress_domain: str = "runna.dev"
 
