@@ -1,6 +1,6 @@
+import uuid
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, Mock
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,12 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
-from app.dependencies import get_execution_client, get_current_user, get_workspace_auth
+from app.dependencies import get_current_user, get_execution_client, get_workspace_auth
 from app.infra.execution_client import ExecutionClient
-from app.models.function import Function
-from app.models.job import Job
-from app.models.user import User
-from app.models.workspace import Workspace
 from app.schemas.user import UserCreate
 from app.schemas.workspace import WorkspaceCreate
 from app.services.user_service import UserService
@@ -67,9 +63,7 @@ def test_user(db_session):
     user_service = UserService(db_session)
     unique_id = str(uuid.uuid4())[:8]
     user_data = UserCreate(
-        username=f"test_user_{unique_id}",
-        name="Test User",
-        password="test_password"
+        username=f"test_user_{unique_id}", name="Test User", password="test_password"
     )
     user = user_service.create_user(user_data)
     return user
@@ -82,7 +76,9 @@ def test_workspace(db_session, test_user):
     """
     workspace_service = WorkspaceService(db_session)
     unique_id = str(uuid.uuid4())[:8]
-    workspace_data = WorkspaceCreate(name=f"test-{unique_id}")  # 20자 제한: "test-" (5자) + uuid (8자) = 13자
+    workspace_data = WorkspaceCreate(
+        name=f"test-{unique_id}"
+    )  # 20자 제한: "test-" (5자) + uuid (8자) = 13자
     workspace = workspace_service.create_workspace(workspace_data, test_user.id)
     return workspace
 

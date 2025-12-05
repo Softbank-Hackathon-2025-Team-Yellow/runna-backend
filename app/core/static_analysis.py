@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 try:
     import esprima
+
     ESPRIMA_AVAILABLE = True
 except ImportError:
     ESPRIMA_AVAILABLE = False
@@ -10,15 +11,15 @@ except ImportError:
 
 class SecurityAnalyzer:
     DANGEROUS_IMPORTS = [
-        "os",           # 시스템 접근
+        "os",  # 시스템 접근
         "subprocess",
         "sys",
         "shutil",
-        "socket",       # 네트워크
+        "socket",  # 네트워크
         "urllib",
         "requests",
         "http",
-        "eval",         # 임의 코드 실행 가능한 직렬화
+        "eval",  # 임의 코드 실행 가능한 직렬화
         "exec",
         "compile",
         "open",
@@ -33,17 +34,17 @@ class SecurityAnalyzer:
     ]
 
     DANGEROUS_BUILTINS = [
-        "eval",         # 동적 코드 실행
+        "eval",  # 동적 코드 실행
         "exec",
         "compile",
-        "open",         # I/O
+        "open",  # I/O
         "input",
-        "__import__",   # 동적 import
+        "__import__",  # 동적 import
         "globals",
         "locals",
         "vars",
         "dir",
-        "getattr",      # 동적 속성 접근
+        "getattr",  # 동적 속성 접근
         "setattr",
         "delattr",
         "hasattr",
@@ -52,10 +53,10 @@ class SecurityAnalyzer:
     ]
 
     DANGEROUS_ATTRIBUTES = [
-        "__code__",     # 내부 접근
+        "__code__",  # 내부 접근
         "__globals__",
         "__builtins__",
-        "__class__",    # 클래스 계층 탐색
+        "__class__",  # 클래스 계층 탐색
         "__bases__",
         "__subclasses__",
         "__dict__",
@@ -172,9 +173,7 @@ class SecurityAnalyzer:
             # Check dangerous attribute access
             elif isinstance(node, ast.Attribute):
                 if node.attr in self.DANGEROUS_ATTRIBUTES:
-                    violations.append(
-                        f"Dangerous attribute access: {node.attr}"
-                    )
+                    violations.append(f"Dangerous attribute access: {node.attr}")
 
             # Check subscript access to dangerous attributes (e.g., obj['__code__'])
             elif isinstance(node, ast.Subscript):
@@ -475,10 +474,10 @@ class SecurityAnalyzer:
         elif node_type == "VariableDeclarator":
             var_id = node.get("id", {})
             init = node.get("init", {})
-            if (
-                var_id.get("type") == "Identifier"
-                and init.get("type") in ["FunctionExpression", "ArrowFunctionExpression"]
-            ):
+            if var_id.get("type") == "Identifier" and init.get("type") in [
+                "FunctionExpression",
+                "ArrowFunctionExpression",
+            ]:
                 functions.append(var_id["name"])
 
         # Check for infinite loops

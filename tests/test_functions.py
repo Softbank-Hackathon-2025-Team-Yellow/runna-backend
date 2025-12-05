@@ -75,6 +75,7 @@ def test_get_function_by_id(client: TestClient, test_workspace):
 
 def test_get_nonexistent_function(client: TestClient):
     import uuid
+
     # UUID 형식으로 존재하지 않는 ID 생성
     nonexistent_id = str(uuid.uuid4())
     response = client.get(f"/functions/{nonexistent_id}")
@@ -83,7 +84,10 @@ def test_get_nonexistent_function(client: TestClient):
     data = response.json()
     assert data["success"] is False
     # Function이 없거나 접근 권한이 없는 경우 ACCESS_DENIED가 반환될 수 있음
-    assert "ACCESS_DENIED" in data["error"]["code"] or "FUNCTION_NOT_FOUND" in data["error"]["code"]
+    assert (
+        "ACCESS_DENIED" in data["error"]["code"]
+        or "FUNCTION_NOT_FOUND" in data["error"]["code"]
+    )
 
 
 def test_update_function(client: TestClient, test_workspace):
@@ -174,7 +178,9 @@ def test_create_nodejs_function_with_syntax_error(client: TestClient, test_works
     assert "Syntax error" in data["error"]["message"]
 
 
-def test_create_nodejs_function_with_dangerous_module(client: TestClient, test_workspace):
+def test_create_nodejs_function_with_dangerous_module(
+    client: TestClient, test_workspace
+):
     """Test that dangerous Node.js modules are blocked"""
     function_data = {
         "name": "malicious_nodejs_function",
@@ -213,8 +219,8 @@ def test_create_valid_nodejs_function(client: TestClient, test_workspace):
 
 def test_endpoint_unique_per_workspace(client: TestClient, db_session, test_user):
     """다른 workspace에서는 같은 endpoint 사용 가능"""
-    from app.services.workspace_service import WorkspaceService
     from app.schemas.workspace import WorkspaceCreate
+    from app.services.workspace_service import WorkspaceService
 
     workspace_service = WorkspaceService(db_session)
 
@@ -271,10 +277,12 @@ def test_endpoint_unique_per_workspace(client: TestClient, db_session, test_user
     assert "already exists" in data["error"]["message"].lower()
 
 
-def test_endpoint_auto_generated_per_workspace(client: TestClient, db_session, test_user):
+def test_endpoint_auto_generated_per_workspace(
+    client: TestClient, db_session, test_user
+):
     """같은 이름의 function이 다른 workspace에서 자동 생성된 endpoint 사용 가능"""
-    from app.services.workspace_service import WorkspaceService
     from app.schemas.workspace import WorkspaceCreate
+    from app.services.workspace_service import WorkspaceService
 
     workspace_service = WorkspaceService(db_session)
 

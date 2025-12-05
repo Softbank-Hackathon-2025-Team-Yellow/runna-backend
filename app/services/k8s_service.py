@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.k8s_client import K8sClient, K8sClientError
-from app.core.mock_k8s_client import MockK8sClient
 from app.models.function import Function
 from app.models.workspace import Workspace
 

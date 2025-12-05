@@ -3,9 +3,12 @@ Tests for Workspace alias functionality.
 
 Tests alias auto-generation, uniqueness, and immutability.
 """
-import pytest
+
 from unittest.mock import MagicMock
-from app.core.sanitize import sanitize_workspace_alias, SanitizationError
+
+import pytest
+
+from app.core.sanitize import SanitizationError, sanitize_workspace_alias
 
 
 class TestWorkspaceAliasSanitization:
@@ -88,7 +91,7 @@ class TestWorkspaceAliasSanitization:
         # First query returns existing, second returns None
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_existing,  # First attempt: duplicate found
-            None            # Second attempt: no duplicate
+            None,  # Second attempt: no duplicate
         ]
 
         alias = sanitize_workspace_alias("myworkspace", db=mock_db)
@@ -108,7 +111,7 @@ class TestWorkspaceAliasSanitization:
             mock_existing1,  # myworkspace exists
             mock_existing2,  # myworkspace-2 exists
             mock_existing3,  # myworkspace-3 exists
-            None             # myworkspace-4 is free
+            None,  # myworkspace-4 is free
         ]
 
         alias = sanitize_workspace_alias("myworkspace", db=mock_db, max_attempts=10)
@@ -120,9 +123,13 @@ class TestWorkspaceAliasSanitization:
 
         # Always return existing workspace
         mock_existing = MagicMock()
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_existing
+        mock_db.query.return_value.filter.return_value.first.return_value = (
+            mock_existing
+        )
 
-        with pytest.raises(SanitizationError, match="unique한 alias를 생성할 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="unique한 alias를 생성할 수 없습니다"
+        ):
             sanitize_workspace_alias("myworkspace", db=mock_db, max_attempts=3)
 
     def test_unicode_and_emoji_removed(self):
@@ -145,7 +152,7 @@ class TestWorkspaceAliasIntegration:
         # First attempt returns duplicate
         mock_db.query.return_value.filter.return_value.first.side_effect = [
             mock_existing,  # myworkspace exists
-            None            # truncated version with suffix is free
+            None,  # truncated version with suffix is free
         ]
 
         alias = sanitize_workspace_alias(long_name, db=mock_db)

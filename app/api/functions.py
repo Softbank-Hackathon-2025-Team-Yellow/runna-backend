@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Body, BackgroundTasks
@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.response import create_error_response, create_success_response
 from app.database import get_db
 from app.dependencies import get_current_user, get_execution_client, get_workspace_auth
+from app.infra.execution_client import ExecutionClient
+from app.models.function import Function
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.models.function import Function
-from app.infra.execution_client import ExecutionClient
 from app.schemas.function import (
     FunctionCreate,
     FunctionResponse,
@@ -29,33 +29,35 @@ from app.infra.deployment_client import DeploymentClient
 router = APIRouter()
 
 
-def _validate_function_access(db: Session, function_id: UUID, user_id: int) -> tuple[bool, Optional[Function], Optional[str]]:
+def _validate_function_access(
+    db: Session, function_id: UUID, user_id: int
+) -> tuple[bool, Optional[Function], Optional[str]]:
     """
     Function에 대한 사용자 접근 권한 검증
-    
+
     Args:
         db: 데이터베이스 세션
         function_id: Function ID
         user_id: 사용자 ID
-        
+
     Returns:
         (접근 가능 여부, Function 객체, 에러 메시지)
     """
     function_service = FunctionService(db)
     function = function_service.get_function(function_id)
-    
+
     if not function:
         return False, None, "Function not found"
-    
+
     workspace_service = WorkspaceService(db)
     workspace = workspace_service.get_workspace_by_id(function.workspace_id)
-    
+
     if not workspace:
         return False, function, "Workspace not found"
-        
+
     if workspace.user_id != user_id:
         return False, function, "You don't have permission to access this function"
-        
+
     return True, function, None
 
 
@@ -79,17 +81,19 @@ def create_function(
         # 워크스페이스 소유권 검증
         workspace_service = WorkspaceService(db)
         workspace = workspace_service.get_workspace_by_id(function.workspace_id)
-        
+
         if not workspace:
             return create_error_response(
-                "WORKSPACE_NOT_FOUND", f"Workspace with id {function.workspace_id} not found"
+                "WORKSPACE_NOT_FOUND",
+                f"Workspace with id {function.workspace_id} not found",
             )
-            
+
         if workspace.user_id != current_user.id:
             return create_error_response(
-                "ACCESS_DENIED", "You don't have permission to create functions in this workspace"
+                "ACCESS_DENIED",
+                "You don't have permission to create functions in this workspace",
             )
-        
+
         service = FunctionService(db)
         db_function = service.create_function(function)
         return create_success_response({"function_id": db_function.id})
@@ -97,8 +101,11 @@ def create_function(
         return create_error_response("VALIDATION_ERROR", str(e))
     except Exception as e:
         import traceback
+
         traceback.print_exc()
-        return create_error_response("INTERNAL_ERROR", f"Internal server error: {str(e)}")
+        return create_error_response(
+            "INTERNAL_ERROR", f"Internal server error: {str(e)}"
+        )
 
 
 @router.put("/{function_id}")
@@ -110,10 +117,12 @@ def update_function(
 ):
     try:
         # 접근 권한 검증
-        has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
         if not has_access:
             return create_error_response("ACCESS_DENIED", error_msg)
-        
+
         service = FunctionService(db)
         function = service.update_function(function_id, function_update)
         if not function:
@@ -134,7 +143,9 @@ def get_function(
     current_user: User = Depends(get_current_user),
 ):
     # 접근 권한 검증
-    has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+    has_access, function, error_msg = _validate_function_access(
+        db, function_id, current_user.id
+    )
     if not has_access:
         return create_error_response("ACCESS_DENIED", error_msg)
 
@@ -149,10 +160,12 @@ def delete_function(
     current_user: User = Depends(get_current_user),
 ):
     # 접근 권한 검증
-    has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+    has_access, function, error_msg = _validate_function_access(
+        db, function_id, current_user.id
+    )
     if not has_access:
         return create_error_response("ACCESS_DENIED", error_msg)
-    
+
     service = FunctionService(db)
     success = service.delete_function(function_id)
     if not success:
@@ -173,10 +186,12 @@ async def invoke_function_with_user_auth(
     """사용자 인증을 통한 Function 실행"""
     try:
         # 접근 권한 검증
-        has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
         if not has_access:
             return create_error_response("ACCESS_DENIED", error_msg)
-        
+
         service = ExecutionService(db, exec_client)
         job = await service.execute_function(function_id, request)
         job_response = JobResponse.model_validate(job)
@@ -200,17 +215,18 @@ async def invoke_function_with_workspace_auth(
         # Function이 해당 워크스페이스에 속하는지 확인
         function_service = FunctionService(db)
         function = function_service.get_function(function_id)
-        
+
         if not function:
             return create_error_response(
                 "FUNCTION_NOT_FOUND", f"Function with id {function_id} not found"
             )
-            
+
         if function.workspace_id != workspace.id:
             return create_error_response(
-                "ACCESS_DENIED", "Function does not belong to the authenticated workspace"
+                "ACCESS_DENIED",
+                "Function does not belong to the authenticated workspace",
             )
-        
+
         service = ExecutionService(db, exec_client)
         job = await service.execute_function(function_id, request)
         job_response = JobResponse.model_validate(job)
@@ -229,10 +245,12 @@ def get_function_jobs(
 ):
     try:
         # 접근 권한 검증
-        has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
         if not has_access:
             return create_error_response("ACCESS_DENIED", error_msg)
-        
+
         service = JobService(db)
         jobs = service.get_job_by_function_id(function_id)
         job_responses = [JobResponse.model_validate(job) for job in jobs]
@@ -252,7 +270,9 @@ def get_function_metrics(
 ):
     try:
         # 접근 권한 검증
-        has_access, function, error_msg = _validate_function_access(db, function_id, current_user.id)
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
         if not has_access:
             return create_error_response("ACCESS_DENIED", error_msg)
 

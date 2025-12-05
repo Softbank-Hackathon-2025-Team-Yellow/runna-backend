@@ -15,11 +15,7 @@ class MockNamespaceManager:
         logger.info("MockNamespaceManager initialized (Kubernetes disabled)")
         self._created_namespaces = set()  # 생성된 namespace 추적용
 
-    def create_function_namespace(
-        self,
-        workspace_name: str,
-        function_id: str
-    ) -> str:
+    def create_function_namespace(self, workspace_name: str, function_id: str) -> str:
         """
         Mock: Namespace 생성 시뮬레이션
 
@@ -45,24 +41,22 @@ class MockNamespaceManager:
 
         # 3. Mock 로그 출력
         logger.info(f"[MOCK] Created namespace: {namespace}")
-        logger.info(f"[MOCK]   Labels: app=runna, workspace={workspace_name}, function-id={function_id}")
+        logger.info(
+            f"[MOCK]   Labels: app=runna, workspace={workspace_name}, function-id={function_id}"
+        )
         logger.info(f"[MOCK] Applied ResourceQuota to {namespace}")
-        logger.info(f"[MOCK]   CPU: 2000m, Memory: 4Gi, Pods: 10")
+        logger.info("[MOCK]   CPU: 2000m, Memory: 4Gi, Pods: 10")
         logger.info(f"[MOCK] Applied LimitRange to {namespace}")
-        logger.info(f"[MOCK]   Default CPU: 500m, Default Memory: 512Mi")
+        logger.info("[MOCK]   Default CPU: 500m, Default Memory: 512Mi")
         logger.info(f"[MOCK] Applied NetworkPolicy to {namespace}")
-        logger.info(f"[MOCK]   Ingress: same namespace only, Egress: all allowed")
+        logger.info("[MOCK]   Ingress: same namespace only, Egress: all allowed")
 
         # 4. 내부 상태 업데이트
         self._created_namespaces.add(namespace)
 
         return namespace
 
-    def delete_function_namespace(
-        self,
-        workspace_name: str,
-        function_id: str
-    ):
+    def delete_function_namespace(self, workspace_name: str, function_id: str):
         """
         Mock: Namespace 삭제 시뮬레이션
 
@@ -77,11 +71,7 @@ class MockNamespaceManager:
         # 내부 상태 업데이트
         self._created_namespaces.discard(namespace)
 
-    def namespace_exists(
-        self,
-        workspace_name: str,
-        function_id: str
-    ) -> bool:
+    def namespace_exists(self, workspace_name: str, function_id: str) -> bool:
         """
         Mock: Namespace 존재 여부 확인
 

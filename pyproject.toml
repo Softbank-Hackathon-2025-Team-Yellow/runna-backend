@@ -19,7 +19,7 @@ include_trailing_comma = true
 [tool.ruff]
 line-length = 88
 select = ["E", "F", "W", "I"]  # flake8 오류 + import 정리
-ignore = []
+ignore = ["E501"]
 exclude = ["alembic"]
 
 [tool.ruff.format]

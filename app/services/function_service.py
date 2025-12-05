@@ -4,11 +4,11 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.core.mock_namespace_manager import MockNamespaceManager
+from app.core.namespace_manager import NamespaceManager
 from app.core.sanitize import (
     sanitize_function_endpoint,
     validate_custom_endpoint,
-    SanitizationError,
 )
 from app.core.static_analysis import analyzer
 from app.models.function import Function
@@ -16,8 +16,6 @@ from app.models.job import Job, JobStatus
 from app.models.workspace import Workspace
 from app.schemas.function import FunctionCreate, FunctionUpdate
 from app.services.k8s_service import K8sService, K8sServiceError
-from app.core.namespace_manager import NamespaceManager
-from app.core.mock_namespace_manager import MockNamespaceManager
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +50,7 @@ class FunctionService:
         return (
             self.db.query(Function)
             .filter(
-                Function.workspace_id == workspace_id,
-                Function.endpoint == endpoint
+                Function.workspace_id == workspace_id, Function.endpoint == endpoint
             )
             .first()
         )
@@ -74,15 +71,19 @@ class FunctionService:
             # 사용자가 custom endpoint 제공 (빈 문자열 제외)
             endpoint = validate_custom_endpoint(function_data.endpoint)
             # Workspace 내 중복 확인
-            if self.get_function_by_workspace_and_endpoint(function_data.workspace_id, endpoint):
-                raise ValueError(f"Endpoint '{endpoint}' already exists in this workspace")
+            if self.get_function_by_workspace_and_endpoint(
+                function_data.workspace_id, endpoint
+            ):
+                raise ValueError(
+                    f"Endpoint '{endpoint}' already exists in this workspace"
+                )
         else:
             # 자동 생성 (workspace 내 중복 시 suffix 자동 추가)
             endpoint = sanitize_function_endpoint(
                 function_data.name,
                 workspace_id=function_data.workspace_id,
                 db=self.db,
-                max_attempts=10
+                max_attempts=10,
             )
 
         # 3. DB에 Function 생성
@@ -109,7 +110,8 @@ class FunctionService:
         # 5. Namespace 생성
         try:
             namespace = self.namespace_manager.create_function_namespace(
-                workspace.name, str(db_function.id)  # UUID를 문자열로 변환
+                workspace.name,
+                str(db_function.id),  # UUID를 문자열로 변환
             )
             logger.info(f"Created namespace {namespace} for function {db_function.id}")
         except Exception as e:
@@ -162,7 +164,9 @@ class FunctionService:
                 db_function.workspace_id, new_endpoint
             )
             if existing and existing.id != db_function.id:
-                raise ValueError(f"Endpoint '{new_endpoint}' already exists in this workspace")
+                raise ValueError(
+                    f"Endpoint '{new_endpoint}' already exists in this workspace"
+                )
             update_data["endpoint"] = new_endpoint
 
         for field, value in update_data.items():
@@ -188,7 +192,8 @@ class FunctionService:
         if workspace:
             try:
                 self.namespace_manager.delete_function_namespace(
-                    workspace.name, str(function_id)  # UUID를 문자열로 변환
+                    workspace.name,
+                    str(function_id),  # UUID를 문자열로 변환
                 )
                 logger.info(f"Deleted namespace for function {function_id}")
             except Exception as e:
