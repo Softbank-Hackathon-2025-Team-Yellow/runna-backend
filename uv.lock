@@ -1132,7 +1132,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.122.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "isort", specifier = ">=7.0.0" },
-    { name = "kubernetes", specifier = ">=31.0.0" },
+    { name = "kubernetes", specifier = ">=34.1.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "pre-commit", specifier = ">=4.5.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.11" },

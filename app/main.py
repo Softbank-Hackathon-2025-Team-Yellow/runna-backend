@@ -32,7 +32,7 @@ app = FastAPI(
     title="Function Runner API",
     description="API for managing and executing functions",
     version="1.0.0",
-    lifespan=lifespan,
+    # lifespan=lifespan,
 )
 
 app.add_middleware(
