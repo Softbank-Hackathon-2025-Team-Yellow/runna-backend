@@ -6,7 +6,7 @@ from kubernetes import client
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.k8s_client import K8sClient, K8sClientError
+from app.core.k8s_client import K8sClient, MockK8sClient, K8sClientError
 from app.models.function import Function
 from app.models.workspace import Workspace
 
@@ -29,7 +29,14 @@ class K8sService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.k8s_client = K8sClient()
+        try:
+            self.k8s_client = K8sClient()
+            logger.info("K8sService initialized with real K8sClient")
+        except Exception as e:
+            logger.warning(f"Failed to initialize K8sClient, using Mock: {e}")
+            from app.core.mock_k8s_client import MockK8sClient
+
+            self.k8s_client = MockK8sClient()
 
     def deploy_function(
         self,

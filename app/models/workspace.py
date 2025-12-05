@@ -25,6 +25,7 @@ class Workspace(Base):
     - 사용자가 name을 변경해도 alias는 고정되어 URL 안정성 보장
     - 최대 20자, 소문자, 숫자, 하이픈만 허용
     """
+
     __tablename__ = "workspaces"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -40,7 +41,7 @@ class Workspace(Base):
     user = relationship("User", back_populates="workspaces")
     functions = relationship("Function", back_populates="workspace")
 
-    @validates('name')
+    @validates("name")
     def validate_name(self, key, name):
         """
         Workspace name을 Kubernetes namespace 규칙에 맞게 검증
@@ -63,17 +64,12 @@ class Workspace(Base):
                 "(to ensure namespace length stays under 63 characters)"
             )
 
-        if not re.match(r'^[a-z0-9-]+$', name):
-            raise ValueError(
-                "Workspace name must contain only lowercase letters, numbers, and hyphens"
-            )
-
-        if name.startswith('-') or name.endswith('-'):
+        if name.startswith("-") or name.endswith("-"):
             raise ValueError("Workspace name cannot start or end with a hyphen")
 
         return name
 
-    @validates('alias')
+    @validates("alias")
     def validate_alias(self, key, alias):
         """
         Workspace alias를 검증
@@ -94,12 +90,12 @@ class Workspace(Base):
         if len(alias) > 20:
             raise ValueError("Workspace alias must be 20 characters or less")
 
-        if not re.match(r'^[a-z0-9-]+$', alias):
+        if not re.match(r"^[a-z0-9-]+$", alias):
             raise ValueError(
                 "Workspace alias must contain only lowercase letters, numbers, and hyphens"
             )
 
-        if alias.startswith('-') or alias.endswith('-'):
+        if alias.startswith("-") or alias.endswith("-"):
             raise ValueError("Workspace alias cannot start or end with a hyphen")
 
         return alias

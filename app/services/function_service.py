@@ -7,7 +7,7 @@ from app.config import settings
 from app.core.sanitize import (
     sanitize_function_endpoint,
     validate_custom_endpoint,
-    SanitizationError
+    SanitizationError,
 )
 from app.core.static_analysis import analyzer
 from app.models.function import Function
@@ -18,29 +18,28 @@ from app.services.k8s_service import K8sService, K8sServiceError
 
 logger = logging.getLogger(__name__)
 
-# Kubernetes 사용 여부에 따라 다른 Manager 임포트
-if settings.kubernetes_in_cluster or settings.kubernetes_config_path:
-    try:
-        from app.core.namespace_manager import NamespaceManager
-        logger.info("Using real NamespaceManager (Kubernetes enabled)")
-    except Exception as e:
-        logger.warning(f"Failed to load NamespaceManager, using Mock: {e}")
-        from app.core.mock_namespace_manager import MockNamespaceManager as NamespaceManager
-else:
-    from app.core.mock_namespace_manager import MockNamespaceManager as NamespaceManager
-    logger.info("Using MockNamespaceManager (Kubernetes disabled)")
-
-
 class FunctionService:
     def __init__(self, db: Session, namespace_manager=None):
         self.db = db
-        self.namespace_manager = namespace_manager or NamespaceManager()
+        
+        # NamespaceManager 초기화 (fallback 메커니즘 포함)
+        if namespace_manager is None:
+            try:
+                from app.core.namespace_manager import NamespaceManager, NamespaceManagerError
+                self.namespace_manager = NamespaceManager()
+                logger.info("FunctionService initialized with real NamespaceManager")
+            except (ImportError, NamespaceManagerError) as e:
+                logger.warning(f"Failed to initialize NamespaceManager, using Mock: {e}")
+                from app.core.mock_namespace_manager import MockNamespaceManager
+                self.namespace_manager = MockNamespaceManager()
+        else:
+            self.namespace_manager = namespace_manager
+            
         self.k8s_service = K8sService(db)
-    
+
     def get_function_by_endpoint(self, endpoint: str) -> Optional[Function]:
         """endpoint로 Function 조회"""
         return self.db.query(Function).filter(Function.endpoint == endpoint).first()
-        
 
     def create_function(self, function_data: FunctionCreate) -> Function:
         # 1. 코드 분석
@@ -62,20 +61,24 @@ class FunctionService:
                 raise ValueError(f"Endpoint '{endpoint}' already exists")
         else:
             # 자동 생성 (중복 시 suffix 자동 추가)
-            endpoint = sanitize_function_endpoint(function_data.name, db=self.db, max_attempts=10)
+            endpoint = sanitize_function_endpoint(
+                function_data.name, db=self.db, max_attempts=10
+            )
 
         # 3. DB에 Function 생성
         function_dict = function_data.model_dump()
-        function_dict['endpoint'] = endpoint  # endpoint 추가
+        function_dict["endpoint"] = endpoint  # endpoint 추가
         db_function = Function(**function_dict)
         self.db.add(db_function)
         self.db.commit()
         self.db.refresh(db_function)
 
         # 4. Workspace 정보 조회
-        workspace = self.db.query(Workspace).filter(
-            Workspace.id == db_function.workspace_id
-        ).first()
+        workspace = (
+            self.db.query(Workspace)
+            .filter(Workspace.id == db_function.workspace_id)
+            .first()
+        )
 
         if not workspace:
             # Function 삭제 후 에러 발생
@@ -86,13 +89,14 @@ class FunctionService:
         # 5. Namespace 생성
         try:
             namespace = self.namespace_manager.create_function_namespace(
-                workspace.name,
-                str(db_function.id)  # UUID를 문자열로 변환
+                workspace.name, str(db_function.id)  # UUID를 문자열로 변환
             )
             logger.info(f"Created namespace {namespace} for function {db_function.id}")
         except Exception as e:
             # Namespace 생성 실패 시 Function 삭제 (rollback)
-            logger.error(f"Failed to create namespace for function {db_function.id}: {e}")
+            logger.error(
+                f"Failed to create namespace for function {db_function.id}: {e}"
+            )
             self.db.delete(db_function)
             self.db.commit()
             raise ValueError(f"Failed to create namespace: {e}")
@@ -162,14 +166,14 @@ class FunctionService:
         if workspace:
             try:
                 self.namespace_manager.delete_function_namespace(
-                    workspace.name,
-                    str(function_id)  # UUID를 문자열로 변환
+                    workspace.name, str(function_id)  # UUID를 문자열로 변환
                 )
                 logger.info(f"Deleted namespace for function {function_id}")
             except Exception as e:
-                logger.error(f"Failed to delete namespace for function {function_id}: {e}")
+                logger.error(
+                    f"Failed to delete namespace for function {function_id}: {e}"
+                )
                 # namespace 삭제 실패해도 DB는 삭제 진행
-        
 
         try:
             # K8s 리소스 정리 (실패해도 DB 정리는 계속 진행)
