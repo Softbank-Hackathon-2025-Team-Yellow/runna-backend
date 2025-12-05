@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
@@ -17,12 +17,14 @@ from app.schemas.function import (
     FunctionUpdate,
     FunctionDeployRequest,
     FunctionDeployResponse,
+    FunctionDeploymentStatusResponse,
 )
 from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
 from app.services.function_service import FunctionService
 from app.services.job_service import JobService
 from app.services.workspace_service import WorkspaceService
+from app.infra.deployment_client import DeploymentClient
 
 router = APIRouter()
 
@@ -266,34 +268,32 @@ def get_function_metrics(
 
 
 @router.post("/{function_id}/deploy")
-def deploy_function(
+async def deploy_function(
     function_id: UUID,
+    background_tasks: BackgroundTasks,
     deploy_request: FunctionDeployRequest = Body(default=FunctionDeployRequest()),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Function을 K8s 클러스터에 배포
-
-    - 코드 존재 및 유효성 검증
-    - 코드 정적 분석 재수행 (보안)
-    - Runtime 검증 (PYTHON/NODEJS만 지원)
-    - KNative Service로 배포
-    - Runtime에 따른 적절한 Docker image 사용
-    - Ingress 자동 생성 및 Public URL 반환
+    Function을 K8s 클러스터에 비동기로 배포 (Future 기반)
+    
+    - Job을 생성하고 즉시 job_id 반환
+    - 백그라운드에서 배포 실행
+    - GET /jobs/{job_id} 또는 GET /functions/{function_id}/deployment로 상태 조회
 
     Args:
         function_id: 배포할 Function ID
         deploy_request: 배포 요청 (환경변수 등)
+        background_tasks: FastAPI BackgroundTasks
 
     Returns:
-        배포 결과 (namespace, service_name, ingress_url)
+        Job ID와 PENDING 상태
 
     Raises:
         VALIDATION_ERROR: 코드가 비어있거나 정적 분석 실패
         ACCESS_DENIED: 권한 없음
         WORKSPACE_NOT_FOUND: Workspace 없음
-        DEPLOYMENT_FAILED: 배포 실패
     """
     try:
         # 1. Function 조회 및 권한 검증
@@ -347,29 +347,90 @@ def deploy_function(
         # 6. Custom path 설정 (endpoint 사용)
         custom_path = function.endpoint  # "/hello" → ingress path
 
-        # 7. 배포 실행
-        function_service = FunctionService(db)
-        deploy_result = function_service.deploy_function_to_k8s(
+        # 7. Deployment Job 생성
+        import json
+        from app.models.job import Job, JobStatus, JobType
+        
+        job = Job(
             function_id=function_id,
-            custom_path=custom_path,
-            env_vars=deploy_request.env_vars
+            job_type=JobType.DEPLOYMENT,
+            status=JobStatus.PENDING
         )
-
-        # 8. 응답 생성
-        response = FunctionDeployResponse(
-            function_id=function.id,
-            function_name=function.name,
-            runtime=function.runtime,
-            namespace=deploy_result["namespace"],
-            service_name=deploy_result["service_name"],
-            ingress_url=deploy_result["ingress_url"]
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        
+        # 8. Future 생성 및 등록
+        import asyncio
+        deployment_client = DeploymentClient()
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        deployment_client.deployment_futures[job.id] = future
+        
+        # 9. 백그라운드 작업 시작
+        background_tasks.add_task(
+            deployment_client.deploy_async,
+            job.id,  # job 객체 대신 ID 전달
+            function_id,
+            custom_path,
+            deploy_request.env_vars
         )
-
-        return create_success_response(response.model_dump())
+        
+        # 10. 즉시 응답
+        return create_success_response({
+            "job_id": job.id,
+            "status": "PENDING",
+            "message": "Deployment started in background. Check status with GET /jobs/{job_id}"
+        })
 
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return create_error_response("DEPLOYMENT_FAILED", f"Failed to deploy function: {str(e)}")
+        return create_error_response("DEPLOYMENT_FAILED", f"Failed to start deployment: {str(e)}")
+
+
+@router.get("/{function_id}/deployment")
+def get_deployment_status(
+    function_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Function 배포 상태 조회
+    
+    Args:
+        function_id: 조회할 Function ID
+        
+    Returns:
+        배포 상태 정보 (deployment_status, knative_url, last_deployed_at, deployment_error)
+        
+    Raises:
+        ACCESS_DENIED: 권한 없음
+        FUNCTION_NOT_FOUND: Function 없음
+    """
+    try:
+        # 접근 권한 검증
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
+        if not has_access:
+            return create_error_response("ACCESS_DENIED", error_msg)
+        
+        # 응답 생성
+        response = FunctionDeploymentStatusResponse(
+            function_id=function.id,
+            function_name=function.name,
+            deployment_status=function.deployment_status,
+            knative_url=function.knative_url,
+            last_deployed_at=function.last_deployed_at,
+            deployment_error=function.deployment_error
+        )
+        
+        return create_success_response(response.model_dump())
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("INTERNAL_ERROR", f"Failed to get deployment status: {str(e)}")

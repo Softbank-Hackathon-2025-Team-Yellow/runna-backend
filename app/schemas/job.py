@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from app.models.job import JobStatus
+from app.models.job import JobStatus, JobType
 
 
 class JobBase(BaseModel):
@@ -25,6 +25,7 @@ class JobUpdate(BaseModel):
 class JobResponse(BaseModel):
     job_id: int = Field(validation_alias="id")
     function_id: uuid.UUID
+    job_type: JobType
     status: JobStatus
     result: Optional[Any] = None
     timestamp: datetime
