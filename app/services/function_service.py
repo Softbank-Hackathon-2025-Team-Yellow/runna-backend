@@ -4,6 +4,11 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core.sanitize import (
+    sanitize_function_endpoint,
+    validate_custom_endpoint,
+    SanitizationError
+)
 from app.core.static_analysis import analyzer
 from app.models.function import Function
 from app.models.job import Job, JobStatus
@@ -30,6 +35,10 @@ class FunctionService:
         self.db = db
         self.namespace_manager = namespace_manager or NamespaceManager()
 
+    def get_function_by_endpoint(self, endpoint: str) -> Optional[Function]:
+        """endpoint로 Function 조회"""
+        return self.db.query(Function).filter(Function.endpoint == endpoint).first()
+
     def create_function(self, function_data: FunctionCreate) -> Function:
         # 1. 코드 분석
         analysis_result = self._analyze_code(
@@ -41,13 +50,26 @@ class FunctionService:
                 f"Code analysis failed: {', '.join(analysis_result['violations'])}"
             )
 
-        # 2. DB에 Function 생성
-        db_function = Function(**function_data.model_dump())
+        # 2. endpoint 생성 또는 검증
+        if function_data.endpoint and function_data.endpoint.strip():
+            # 사용자가 custom endpoint 제공 (빈 문자열 제외)
+            endpoint = validate_custom_endpoint(function_data.endpoint)
+            # 중복 확인
+            if self.get_function_by_endpoint(endpoint):
+                raise ValueError(f"Endpoint '{endpoint}' already exists")
+        else:
+            # 자동 생성 (중복 시 suffix 자동 추가)
+            endpoint = sanitize_function_endpoint(function_data.name, db=self.db, max_attempts=10)
+
+        # 3. DB에 Function 생성
+        function_dict = function_data.model_dump()
+        function_dict['endpoint'] = endpoint  # endpoint 추가
+        db_function = Function(**function_dict)
         self.db.add(db_function)
         self.db.commit()
         self.db.refresh(db_function)
 
-        # 3. Workspace 정보 조회
+        # 4. Workspace 정보 조회
         workspace = self.db.query(Workspace).filter(
             Workspace.id == db_function.workspace_id
         ).first()
@@ -58,7 +80,7 @@ class FunctionService:
             self.db.commit()
             raise ValueError("Workspace not found")
 
-        # 4. Namespace 생성
+        # 5. Namespace 생성
         try:
             namespace = self.namespace_manager.create_function_namespace(
                 workspace.name,
@@ -92,6 +114,7 @@ class FunctionService:
 
         update_data = function_update.model_dump(exclude_unset=True)
 
+        # 코드 검증
         if "code" in update_data:
             runtime = update_data.get("runtime", db_function.runtime)
             analysis_result = self._analyze_code(
@@ -103,6 +126,15 @@ class FunctionService:
                 raise ValueError(
                     f"Code analysis failed: {', '.join(analysis_result['violations'])}"
                 )
+
+        # endpoint 검증 및 변경
+        if "endpoint" in update_data:
+            new_endpoint = validate_custom_endpoint(update_data["endpoint"])
+            # 중복 확인 (자신 제외)
+            existing = self.get_function_by_endpoint(new_endpoint)
+            if existing and existing.id != db_function.id:
+                raise ValueError(f"Endpoint '{new_endpoint}' already exists")
+            update_data["endpoint"] = new_endpoint
 
         for field, value in update_data.items():
             setattr(db_function, field, value)
@@ -174,9 +206,9 @@ class FunctionService:
         }
 
     def _analyze_code(self, code: str, runtime: str) -> dict:
-        if runtime == "python":
+        if runtime == "PYTHON":
             return analyzer.analyze_python_code(code)
-        elif runtime == "nodejs":
+        elif runtime == "NODEJS":
             return analyzer.analyze_nodejs_code(code)
         else:
             return {"is_safe": False, "violations": ["Unsupported runtime"]}

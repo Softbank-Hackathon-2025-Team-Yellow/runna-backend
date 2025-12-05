@@ -5,9 +5,9 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
     # Create a function first
     function_data = {
         "name": "test_sync_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return {'result': event.get('param1', 'default')}",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -37,9 +37,9 @@ def test_invoke_sync_function_failure(client: TestClient, mock_exec_client):
     # Create a function first
     function_data = {
         "name": "test_sync_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -67,9 +67,9 @@ def test_invoke_async_function(client: TestClient, mock_exec_client):
     # Create an async function
     function_data = {
         "name": "test_async_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "async",
+        "execution_type": "ASYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -96,9 +96,9 @@ def test_get_function_jobs(client: TestClient, mock_exec_client):
     # Create a function
     function_data = {
         "name": "test_function_jobs",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -129,9 +129,9 @@ def test_get_job(client: TestClient, mock_exec_client):
     # Create a function
     function_data = {
         "name": "test_get_job",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)

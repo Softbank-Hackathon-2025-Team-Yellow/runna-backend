@@ -38,15 +38,17 @@ class WorkspaceUpdate(BaseModel):
 class WorkspaceResponse(WorkspaceBase):
     """
     Workspace 응답 스키마
-    
+
     Args:
         id: 워크스페이스 UUID
         name: 워크스페이스 이름
+        alias: 워크스페이스 불변 식별자 (subdomain/namespace 연결용)
         user_id: 소유자 사용자 ID
         created_at: 생성 일시
         updated_at: 수정 일시
     """
     id: uuid.UUID
+    alias: str
     user_id: int
     created_at: datetime
     updated_at: datetime

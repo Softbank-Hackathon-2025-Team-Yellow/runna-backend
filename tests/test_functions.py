@@ -4,9 +4,9 @@ from fastapi.testclient import TestClient
 def test_create_function(client: TestClient):
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return {'result': 'success'}",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     response = client.post("/functions/", json=function_data)
@@ -30,9 +30,9 @@ def test_get_functions_with_data(client: TestClient):
     # Create a function first
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -52,9 +52,9 @@ def test_get_function_by_id(client: TestClient):
     # Create a function first
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -83,9 +83,9 @@ def test_update_function(client: TestClient):
     # Create a function first
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -109,9 +109,9 @@ def test_delete_function(client: TestClient):
     # Create a function first
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -132,9 +132,9 @@ def test_delete_function(client: TestClient):
 def test_create_function_with_invalid_code(client: TestClient):
     function_data = {
         "name": "malicious_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "import os; os.system('rm -rf /')",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     response = client.post("/functions/", json=function_data)
@@ -149,9 +149,9 @@ def test_create_nodejs_function_with_syntax_error(client: TestClient):
     """Test that JavaScript syntax errors are caught"""
     function_data = {
         "name": "broken_js_function",
-        "runtime": "nodejs",
+        "runtime": "NODEJS",
         "code": "function handler(event { return { message: 'Hello' }; }",  # Missing )
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     response = client.post("/functions/", json=function_data)
@@ -167,9 +167,9 @@ def test_create_nodejs_function_with_dangerous_module(client: TestClient):
     """Test that dangerous Node.js modules are blocked"""
     function_data = {
         "name": "malicious_nodejs_function",
-        "runtime": "nodejs",
+        "runtime": "NODEJS",
         "code": "const fs = require('fs'); function handler(e) { return fs.readFileSync('/etc/passwd'); }",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     response = client.post("/functions/", json=function_data)
@@ -185,9 +185,9 @@ def test_create_valid_nodejs_function(client: TestClient):
     """Test that valid JavaScript code is accepted"""
     function_data = {
         "name": "valid_nodejs_function",
-        "runtime": "nodejs",
+        "runtime": "NODEJS",
         "code": "function handler(event) { return { message: 'Hello World', data: event }; }",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
     }
 
     response = client.post("/functions/", json=function_data)

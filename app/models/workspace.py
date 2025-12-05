@@ -19,11 +19,17 @@ class Workspace(Base):
     - 최대 20자 (function ID와 결합 시 63자 제한 준수)
     - 소문자, 숫자, 하이픈(-)만 사용 가능
     - 하이픈으로 시작하거나 끝날 수 없음
+
+    Workspace alias:
+    - 불변(immutable) 식별자로 subdomain/namespace 연결에 사용
+    - 사용자가 name을 변경해도 alias는 고정되어 URL 안정성 보장
+    - 최대 20자, 소문자, 숫자, 하이픈만 허용
     """
     __tablename__ = "workspaces"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(255), unique=True, nullable=False, index=True)
+    alias = Column(String(20), unique=True, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -66,3 +72,34 @@ class Workspace(Base):
             raise ValueError("Workspace name cannot start or end with a hyphen")
 
         return name
+
+    @validates('alias')
+    def validate_alias(self, key, alias):
+        """
+        Workspace alias를 검증
+
+        규칙:
+        - 비어있지 않음
+        - 최대 20자
+        - 소문자, 숫자, 하이픈(-)만 허용
+        - 하이픈으로 시작/끝나면 안됨
+        - 불변(immutable) - 한 번 설정되면 변경 불가
+
+        Raises:
+            ValueError: 규칙에 맞지 않는 경우
+        """
+        if not alias:
+            raise ValueError("Workspace alias cannot be empty")
+
+        if len(alias) > 20:
+            raise ValueError("Workspace alias must be 20 characters or less")
+
+        if not re.match(r'^[a-z0-9-]+$', alias):
+            raise ValueError(
+                "Workspace alias must contain only lowercase letters, numbers, and hyphens"
+            )
+
+        if alias.startswith('-') or alias.endswith('-'):
+            raise ValueError("Workspace alias cannot start or end with a hyphen")
+
+        return alias

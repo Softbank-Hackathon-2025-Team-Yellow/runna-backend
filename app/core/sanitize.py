@@ -5,6 +5,7 @@ Injection 공격에 대한 다층 방어를 제공하고 Kubernetes namespace �
 """
 import re
 from typing import Optional
+from sqlalchemy.orm import Session
 
 
 class SanitizationError(ValueError):
@@ -211,3 +212,196 @@ def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     validate_namespace_name(namespace)
 
     return namespace
+
+
+def sanitize_workspace_alias(name: str, db: Optional[Session] = None, max_attempts: int = 10) -> str:
+    """
+    Workspace name을 기반으로 안전한 alias를 생성합니다.
+
+    alias는 workspace의 불변 식별자로 사용되며, subdomain/namespace 연결에 활용됩니다.
+    중복 발생 시 자동으로 suffix를 추가합니다 (예: my-workspace, my-workspace-2, my-workspace-3).
+
+    Args:
+        name: 원본 workspace 이름
+        db: 중복 검사를 위한 데이터베이스 세션 (선택적)
+        max_attempts: 중복 해결을 위한 최대 시도 횟수
+
+    Returns:
+        안전한 alias 문자열
+
+    Raises:
+        SanitizationError: alias 생성 실패 시
+    """
+    if not name:
+        raise SanitizationError("Workspace 이름은 비어있을 수 없습니다")
+
+    # 1. 기본 정규화
+    alias = name.strip().lower()
+
+    # 2. 특수문자를 하이픈으로 변환
+    alias = re.sub(r'[^a-z0-9-]', '-', alias)
+
+    # 3. 연속된 하이픈 제거
+    alias = re.sub(r'-+', '-', alias)
+
+    # 4. 앞뒤 하이픈 제거
+    alias = alias.strip('-')
+
+    # 5. 최대 20자 제한
+    if len(alias) > 20:
+        alias = alias[:20].rstrip('-')
+
+    # 6. 최소 1자 검증
+    if len(alias) < 1:
+        raise SanitizationError("Sanitization 후 alias가 비어있습니다")
+
+    # 7. 예약어 검증
+    reserved_names = {'default', 'kube-system', 'kube-public', 'kube-node-lease'}
+    if alias in reserved_names:
+        alias = f"{alias}-ws"  # workspace suffix 추가
+
+    # 8. 중복 검사 및 해결 (db가 제공된 경우)
+    if db:
+        from app.models.workspace import Workspace
+
+        base_alias = alias
+        for attempt in range(1, max_attempts + 1):
+            existing = db.query(Workspace).filter(Workspace.alias == alias).first()
+            if not existing:
+                break
+
+            # 중복 발생 시 suffix 추가
+            suffix = f"-{attempt + 1}"
+            max_base_length = 20 - len(suffix)
+            alias = f"{base_alias[:max_base_length]}{suffix}"
+        else:
+            raise SanitizationError(
+                f"'{base_alias}' 기반으로 unique한 alias를 생성할 수 없습니다 "
+                f"({max_attempts}번 시도)"
+            )
+
+    return alias
+
+
+def sanitize_function_endpoint(name: str, db: Optional[Session] = None, max_attempts: int = 10) -> str:
+    """
+    Function name을 기반으로 안전한 endpoint를 생성합니다.
+
+    endpoint는 Function 호출을 위한 URL 경로입니다 (예: /my-function).
+    중복 발생 시 자동으로 suffix를 추가합니다.
+
+    Args:
+        name: 원본 function 이름
+        db: 중복 검사를 위한 데이터베이스 세션 (선택적)
+        max_attempts: 중복 해결을 위한 최대 시도 횟수
+
+    Returns:
+        안전한 endpoint 문자열 (/ 포함)
+
+    Raises:
+        SanitizationError: endpoint 생성 실패 시
+    """
+    if not name:
+        raise SanitizationError("Function 이름은 비어있을 수 없습니다")
+
+    # 1. 기본 정규화
+    endpoint = name.strip().lower()
+
+    # 2. 특수문자를 하이픈으로 변환
+    endpoint = re.sub(r'[^a-z0-9-/]', '-', endpoint)
+
+    # 3. 연속된 하이픈/슬래시 제거
+    endpoint = re.sub(r'-+', '-', endpoint)
+    endpoint = re.sub(r'/+', '/', endpoint)
+
+    # 4. 앞뒤 하이픈/슬래시 제거
+    endpoint = endpoint.strip('-').strip('/')
+
+    # 5. 최대 99자 제한 (/ prefix를 위해 1자 남김)
+    if len(endpoint) > 99:
+        endpoint = endpoint[:99].rstrip('-')
+
+    # 6. 최소 1자 검증
+    if len(endpoint) < 1:
+        raise SanitizationError("Sanitization 후 endpoint가 비어있습니다")
+
+    # 7. / prefix 추가
+    endpoint = f"/{endpoint}"
+
+    # 8. 중복 검사 및 해결 (db가 제공된 경우)
+    if db:
+        from app.models.function import Function
+
+        base_endpoint = endpoint
+        for attempt in range(1, max_attempts + 1):
+            existing = db.query(Function).filter(Function.endpoint == endpoint).first()
+            if not existing:
+                break
+
+            # 중복 발생 시 suffix 추가
+            suffix = f"-{attempt + 1}"
+            max_base_length = 99 - len(suffix)
+            # / 제거 후 base 추출
+            base_without_slash = base_endpoint[1:]
+            endpoint = f"/{base_without_slash[:max_base_length]}{suffix}"
+        else:
+            raise SanitizationError(
+                f"'{base_endpoint}' 기반으로 unique한 endpoint를 생성할 수 없습니다 "
+                f"({max_attempts}번 시도)"
+            )
+
+    return endpoint
+
+
+def validate_custom_endpoint(endpoint: str) -> str:
+    """
+    사용자가 직접 입력한 custom endpoint를 검증합니다.
+
+    Args:
+        endpoint: 사용자 입력 endpoint
+
+    Returns:
+        검증된 endpoint
+
+    Raises:
+        SanitizationError: endpoint가 유효하지 않은 경우
+    """
+    if not endpoint:
+        raise SanitizationError("Endpoint는 비어있을 수 없습니다")
+
+    endpoint = endpoint.strip()
+
+    if not endpoint:
+        raise SanitizationError("Endpoint는 비어있을 수 없습니다")
+
+    if not endpoint.startswith('/'):
+        raise SanitizationError("Endpoint는 /로 시작해야 합니다")
+
+    if len(endpoint) > 100:
+        raise SanitizationError(
+            f"Endpoint는 100자 이하여야 합니다 (현재 {len(endpoint)}자)"
+        )
+
+    # URL-safe 문자만 허용
+    if not re.match(r'^/[a-z0-9/-]+$', endpoint):
+        raise SanitizationError(
+            "Endpoint는 소문자, 숫자, 하이픈, 슬래시만 포함해야 합니다"
+        )
+
+    # 연속된 하이픈 불가
+    if '--' in endpoint:
+        raise SanitizationError("Endpoint는 연속된 하이픈을 포함할 수 없습니다")
+
+    # 연속된 슬래시 불가
+    if '//' in endpoint:
+        raise SanitizationError("Endpoint는 연속된 슬래시를 포함할 수 없습니다")
+
+    # 하이픈으로 끝나면 안됨
+    if endpoint.endswith('-'):
+        raise SanitizationError("Endpoint는 하이픈으로 끝날 수 없습니다")
+
+    # 슬래시로만 구성되면 안됨
+    if endpoint == '/':
+        raise SanitizationError("Endpoint는 /만으로 구성될 수 없습니다")
+
+    return endpoint
