@@ -1,5 +1,3 @@
-import pytest
-
 from app.core.static_analysis import analyzer
 
 

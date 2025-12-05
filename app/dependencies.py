@@ -68,16 +68,16 @@ def get_workspace_auth(
 ) -> Workspace:
     """
     워크스페이스 Bearer 토큰을 통해 워크스페이스 인증
-    
+
     Function 실행 등 워크스페이스 리소스 접근 시 사용
-    
+
     Args:
         credentials: HTTP Authorization Bearer 토큰
         db: 데이터베이스 세션
-        
+
     Returns:
         인증된 Workspace 객체
-        
+
     Raises:
         HTTPException: 토큰이 유효하지 않거나 워크스페이스를 찾을 수 없는 경우
     """

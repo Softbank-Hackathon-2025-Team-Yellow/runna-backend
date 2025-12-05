@@ -3,13 +3,15 @@ Tests for sanitization and validation utilities.
 
 Tests the multi-layer defense system for workspace and namespace names.
 """
+
 import pytest
+
 from app.core.sanitize import (
+    SanitizationError,
+    create_safe_namespace_name,
+    sanitize_function_id,
     sanitize_workspace_name,
     validate_namespace_name,
-    sanitize_function_id,
-    create_safe_namespace_name,
-    SanitizationError
 )
 
 
@@ -24,7 +26,7 @@ class TestWorkspaceNameSanitization:
             "workspace123",
             "w",
             "a1b2c3",
-            "test-app-2024"
+            "test-app-2024",
         ]
         for name in valid_names:
             result = sanitize_workspace_name(name)
@@ -41,7 +43,9 @@ class TestWorkspaceNameSanitization:
         with pytest.raises(SanitizationError, match="비어있을 수 없습니다"):
             sanitize_workspace_name("")
 
-        with pytest.raises(SanitizationError, match="비어있거나 공백만으로 구성될 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="비어있거나 공백만으로 구성될 수 없습니다"
+        ):
             sanitize_workspace_name("   ")
 
     def test_path_traversal_blocked(self):
@@ -83,7 +87,7 @@ class TestWorkspaceNameSanitization:
             "work space",  # space
             "work@space",  # @
             "work#space",  # #
-            "work$pace",   # $
+            "work$pace",  # $
             "work%space",  # %
             "work&space",  # &
             "work*space",  # *
@@ -112,13 +116,19 @@ class TestWorkspaceNameSanitization:
 
     def test_hyphen_at_start_or_end_blocked(self):
         """Names starting or ending with hyphen should be blocked"""
-        with pytest.raises(SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"
+        ):
             sanitize_workspace_name("-workspace")
 
-        with pytest.raises(SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"
+        ):
             sanitize_workspace_name("workspace-")
 
-        with pytest.raises(SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"):
+        with pytest.raises(
+            SanitizationError, match="하이픈으로 시작하거나 끝날 수 없습니다"
+        ):
             sanitize_workspace_name("-workspace-")
 
     def test_length_limit_enforced(self):
@@ -169,7 +179,9 @@ class TestNamespaceValidation:
     def test_too_long_namespace_rejected(self):
         """Namespace longer than 63 characters should be rejected"""
         # 57 characters in valid format - should pass
-        namespace_57 = "workspace-12345678-1234-1234-1234-123456789abc"  # 57 chars total
+        namespace_57 = (
+            "workspace-12345678-1234-1234-1234-123456789abc"  # 57 chars total
+        )
         validate_namespace_name(namespace_57)
 
         # 64 characters - should fail
@@ -200,7 +212,7 @@ class TestNamespaceValidation:
         """Single word namespace without hyphen should be allowed"""
         # Single word is now valid - no minimum hyphen requirement
         validate_namespace_name("workspace")  # Should pass
-        validate_namespace_name("app123")     # Should pass
+        validate_namespace_name("app123")  # Should pass
 
 
 class TestFunctionIdSanitization:
@@ -295,7 +307,9 @@ class TestCreateSafeNamespaceName:
 
     def test_length_stays_under_limit(self):
         """Final namespace should stay under 63 characters"""
-        # Maximum workspace name (20 chars) + maximum UUID (36 chars) + hyphen (1 char) = 57 chars
+        # Maximum workspace name (20 chars)
+        # + maximum UUID (36 chars)
+        # + hyphen (1 char) = 57 chars
         max_workspace = "a" * 20
         function_id = "12345678-1234-1234-1234-123456789abc"
 

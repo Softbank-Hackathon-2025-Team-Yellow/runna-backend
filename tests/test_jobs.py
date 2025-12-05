@@ -56,7 +56,9 @@ def test_get_nonexistent_job(client: TestClient):
     assert "JOB_NOT_FOUND" in data["error"]["code"]
 
 
-def test_job_creation_with_failed_execution(client: TestClient, mock_exec_client, test_workspace):
+def test_job_creation_with_failed_execution(
+    client: TestClient, mock_exec_client, test_workspace
+):
     # Create a function
     function_data = {
         "name": "test_function",
@@ -123,7 +125,9 @@ def test_async_job_creation(client: TestClient, mock_exec_client, test_workspace
     assert data["data"]["result"] is None
 
 
-def test_multiple_jobs_for_function(client: TestClient, mock_exec_client, test_workspace):
+def test_multiple_jobs_for_function(
+    client: TestClient, mock_exec_client, test_workspace
+):
     # Create a function
     function_data = {
         "name": "test_function",

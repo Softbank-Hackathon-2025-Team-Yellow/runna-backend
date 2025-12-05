@@ -3,13 +3,16 @@ Workspace 및 namespace 이름에 대한 Sanitization 및 검증 유틸리티
 
 Injection 공격에 대한 다층 방어를 제공하고 Kubernetes namespace 호환성을 보장합니다.
 """
+
 import re
 from typing import Optional
+
 from sqlalchemy.orm import Session
 
 
 class SanitizationError(ValueError):
     """Sanitization 또는 검증 실패 시 발생하는 예외"""
+
     pass
 
 
@@ -45,16 +48,18 @@ def sanitize_workspace_name(name: str, strict: bool = True) -> str:
     name = name.strip()
 
     if not name:
-        raise SanitizationError("Workspace 이름은 비어있거나 공백만으로 구성될 수 없습니다")
+        raise SanitizationError(
+            "Workspace 이름은 비어있거나 공백만으로 구성될 수 없습니다"
+        )
 
     # Path traversal 시도 확인
-    if '..' in name or '/' in name or '\\' in name:
+    if ".." in name or "/" in name or "\\" in name:
         raise SanitizationError(
             "Workspace 이름은 경로 탐색 문자(., /, \\)를 포함할 수 없습니다"
         )
 
     # Null byte 확인 (일반적인 injection 기술)
-    if '\0' in name or '\x00' in name:
+    if "\0" in name or "\x00" in name:
         raise SanitizationError("Workspace 이름은 null 바이트를 포함할 수 없습니다")
 
     # 제어 문자 제거 (ASCII 0-31, 127)
@@ -62,14 +67,14 @@ def sanitize_workspace_name(name: str, strict: bool = True) -> str:
         if strict:
             raise SanitizationError("Workspace 이름은 제어 문자를 포함할 수 없습니다")
         else:
-            name = ''.join(c for c in name if ord(c) >= 32 and ord(c) != 127)
+            name = "".join(c for c in name if ord(c) >= 32 and ord(c) != 127)
 
     # 소문자로 변환 (Kubernetes 요구사항)
     name = name.lower()
 
     # Kubernetes DNS-1123 label 요구사항 확인
     # 소문자 영숫자 문자 또는 '-'로만 구성되어야 함
-    if not re.match(r'^[a-z0-9-]+$', name):
+    if not re.match(r"^[a-z0-9-]+$", name):
         if strict:
             raise SanitizationError(
                 "Workspace 이름은 소문자, 숫자, 하이픈만 포함해야 합니다. "
@@ -77,16 +82,18 @@ def sanitize_workspace_name(name: str, strict: bool = True) -> str:
             )
         else:
             # 유효하지 않은 문자를 하이픈으로 교체
-            name = re.sub(r'[^a-z0-9-]', '-', name)
+            name = re.sub(r"[^a-z0-9-]", "-", name)
             # 연속된 하이픈 제거
-            name = re.sub(r'-+', '-', name)
+            name = re.sub(r"-+", "-", name)
 
     # 하이픈으로 시작하거나 끝나면 안됨
-    if name.startswith('-') or name.endswith('-'):
+    if name.startswith("-") or name.endswith("-"):
         if strict:
-            raise SanitizationError("Workspace 이름은 하이픈으로 시작하거나 끝날 수 없습니다")
+            raise SanitizationError(
+                "Workspace 이름은 하이픈으로 시작하거나 끝날 수 없습니다"
+            )
         else:
-            name = name.strip('-')
+            name = name.strip("-")
 
     # 길이 제약 (workspace 최대 20자 + UUID 36자 + 하이픈 1자 = 57 < 63)
     if len(name) > 20:
@@ -96,10 +103,12 @@ def sanitize_workspace_name(name: str, strict: bool = True) -> str:
         )
 
     if len(name) < 1:
-        raise SanitizationError("Sanitization 후 workspace 이름은 최소 1자 이상이어야 합니다")
+        raise SanitizationError(
+            "Sanitization 후 workspace 이름은 최소 1자 이상이어야 합니다"
+        )
 
     # Kubernetes 예약 namespace 차단
-    reserved_names = {'default', 'kube-system', 'kube-public', 'kube-node-lease'}
+    reserved_names = {"default", "kube-system", "kube-public", "kube-node-lease"}
     if name in reserved_names:
         raise SanitizationError(
             f"Workspace 이름 '{name}'은(는) Kubernetes에 예약되어 있어 사용할 수 없습니다"
@@ -136,7 +145,7 @@ def validate_namespace_name(namespace: str) -> None:
         )
 
     # Kubernetes DNS-1123 label 형식과 일치해야 함
-    if not re.match(r'^[a-z0-9]([-a-z0-9]*[a-z0-9])?$', namespace):
+    if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", namespace):
         raise SanitizationError(
             f"Namespace 이름 '{namespace}'이(가) Kubernetes DNS-1123 label 형식과 일치하지 않습니다. "
             "영숫자로 시작하고 끝나야 하며, 소문자, 숫자, 하이픈만 포함해야 합니다."
@@ -144,7 +153,7 @@ def validate_namespace_name(namespace: str) -> None:
 
     # 추가 보안: 의심스러운 패턴 확인
     # 연속된 하이픈은 injection 시도를 나타낼 수 있음
-    if '--' in namespace:
+    if "--" in namespace:
         raise SanitizationError(
             f"Namespace 이름 '{namespace}'에 연속된 하이픈이 포함되어 있어 의심스럽습니다"
         )
@@ -170,7 +179,7 @@ def sanitize_function_id(function_id: str) -> str:
         raise SanitizationError("Function ID는 비어있을 수 없습니다")
 
     # UUID 형식: 8-4-4-4-12 16진수 문자
-    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
     function_id = function_id.lower().strip()
 
@@ -214,7 +223,9 @@ def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     return namespace
 
 
-def sanitize_workspace_alias(name: str, db: Optional[Session] = None, max_attempts: int = 10) -> str:
+def sanitize_workspace_alias(
+    name: str, db: Optional[Session] = None, max_attempts: int = 10
+) -> str:
     """
     Workspace name을 기반으로 안전한 alias를 생성합니다.
 
@@ -239,24 +250,24 @@ def sanitize_workspace_alias(name: str, db: Optional[Session] = None, max_attemp
     alias = name.strip().lower()
 
     # 2. 특수문자를 하이픈으로 변환
-    alias = re.sub(r'[^a-z0-9-]', '-', alias)
+    alias = re.sub(r"[^a-z0-9-]", "-", alias)
 
     # 3. 연속된 하이픈 제거
-    alias = re.sub(r'-+', '-', alias)
+    alias = re.sub(r"-+", "-", alias)
 
     # 4. 앞뒤 하이픈 제거
-    alias = alias.strip('-')
+    alias = alias.strip("-")
 
     # 5. 최대 20자 제한
     if len(alias) > 20:
-        alias = alias[:20].rstrip('-')
+        alias = alias[:20].rstrip("-")
 
     # 6. 최소 1자 검증
     if len(alias) < 1:
         raise SanitizationError("Sanitization 후 alias가 비어있습니다")
 
     # 7. 예약어 검증
-    reserved_names = {'default', 'kube-system', 'kube-public', 'kube-node-lease'}
+    reserved_names = {"default", "kube-system", "kube-public", "kube-node-lease"}
     if alias in reserved_names:
         alias = f"{alias}-ws"  # workspace suffix 추가
 
@@ -284,10 +295,7 @@ def sanitize_workspace_alias(name: str, db: Optional[Session] = None, max_attemp
 
 
 def sanitize_function_endpoint(
-    name: str,
-    workspace_id=None,
-    db: Optional[Session] = None,
-    max_attempts: int = 10
+    name: str, workspace_id=None, db: Optional[Session] = None, max_attempts: int = 10
 ) -> str:
     """
     Function name을 기반으로 안전한 endpoint를 생성합니다.
@@ -314,18 +322,18 @@ def sanitize_function_endpoint(
     endpoint = name.strip().lower()
 
     # 2. 특수문자를 하이픈으로 변환
-    endpoint = re.sub(r'[^a-z0-9-/]', '-', endpoint)
+    endpoint = re.sub(r"[^a-z0-9-/]", "-", endpoint)
 
     # 3. 연속된 하이픈/슬래시 제거
-    endpoint = re.sub(r'-+', '-', endpoint)
-    endpoint = re.sub(r'/+', '/', endpoint)
+    endpoint = re.sub(r"-+", "-", endpoint)
+    endpoint = re.sub(r"/+", "/", endpoint)
 
     # 4. 앞뒤 하이픈/슬래시 제거
-    endpoint = endpoint.strip('-').strip('/')
+    endpoint = endpoint.strip("-").strip("/")
 
     # 5. 최대 99자 제한 (/ prefix를 위해 1자 남김)
     if len(endpoint) > 99:
-        endpoint = endpoint[:99].rstrip('-')
+        endpoint = endpoint[:99].rstrip("-")
 
     # 6. 최소 1자 검증
     if len(endpoint) < 1:
@@ -342,13 +350,19 @@ def sanitize_function_endpoint(
         for attempt in range(1, max_attempts + 1):
             # Workspace 내 중복 검사
             if workspace_id:
-                existing = db.query(Function).filter(
-                    Function.workspace_id == workspace_id,
-                    Function.endpoint == endpoint
-                ).first()
+                existing = (
+                    db.query(Function)
+                    .filter(
+                        Function.workspace_id == workspace_id,
+                        Function.endpoint == endpoint,
+                    )
+                    .first()
+                )
             else:
                 # workspace_id가 없으면 전역 검사 (하위 호환성)
-                existing = db.query(Function).filter(Function.endpoint == endpoint).first()
+                existing = (
+                    db.query(Function).filter(Function.endpoint == endpoint).first()
+                )
 
             if not existing:
                 break
@@ -389,7 +403,7 @@ def validate_custom_endpoint(endpoint: str) -> str:
     if not endpoint:
         raise SanitizationError("Endpoint는 비어있을 수 없습니다")
 
-    if not endpoint.startswith('/'):
+    if not endpoint.startswith("/"):
         raise SanitizationError("Endpoint는 /로 시작해야 합니다")
 
     if len(endpoint) > 100:
@@ -398,25 +412,25 @@ def validate_custom_endpoint(endpoint: str) -> str:
         )
 
     # URL-safe 문자만 허용
-    if not re.match(r'^/[a-z0-9/-]+$', endpoint):
+    if not re.match(r"^/[a-z0-9/-]+$", endpoint):
         raise SanitizationError(
             "Endpoint는 소문자, 숫자, 하이픈, 슬래시만 포함해야 합니다"
         )
 
     # 연속된 하이픈 불가
-    if '--' in endpoint:
+    if "--" in endpoint:
         raise SanitizationError("Endpoint는 연속된 하이픈을 포함할 수 없습니다")
 
     # 연속된 슬래시 불가
-    if '//' in endpoint:
+    if "//" in endpoint:
         raise SanitizationError("Endpoint는 연속된 슬래시를 포함할 수 없습니다")
 
     # 하이픈으로 끝나면 안됨
-    if endpoint.endswith('-'):
+    if endpoint.endswith("-"):
         raise SanitizationError("Endpoint는 하이픈으로 끝날 수 없습니다")
 
     # 슬래시로만 구성되면 안됨
-    if endpoint == '/':
+    if endpoint == "/":
         raise SanitizationError("Endpoint는 /만으로 구성될 수 없습니다")
 
     return endpoint

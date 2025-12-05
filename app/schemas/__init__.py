@@ -1,6 +1,6 @@
 from .function import FunctionCreate, FunctionResponse, FunctionUpdate
 from .job import JobResponse
-from .message import Execution, ExecutionStatus, Callback
+from .message import Callback, Execution, ExecutionStatus
 from .user import Token, User, UserCreate, UserLogin
 from .workspace import (
     WorkspaceAuthKey,
@@ -12,11 +12,11 @@ from .workspace import (
 
 __all__ = [
     "FunctionCreate",
-    "FunctionResponse", 
+    "FunctionResponse",
     "FunctionUpdate",
     "JobResponse",
     "Execution",
-    "ExecutionStatus", 
+    "ExecutionStatus",
     "Callback",
     "Token",
     "User",

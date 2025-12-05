@@ -3,6 +3,7 @@ Namespace 구현 검증 테스트
 
 Phase 5: 구현된 기능들의 동작 확인
 """
+
 import sys
 
 
@@ -31,7 +32,7 @@ def test_workspace_name_validation():
         try:
             # SQLAlchemy @validates 호출하기 위해 임시 인스턴스 생성 시도
             ws = Workspace()
-            validated_name = ws.validate_name('name', name)
+            validated_name = ws.validate_name("name", name)
 
             if should_pass:
                 print(f"  PASS: '{name}' - {description}")
@@ -59,16 +60,17 @@ def test_namespace_manager_import():
 
     try:
         from app.core.namespace_manager import NamespaceManager
+
         print("  PASS: NamespaceManager imported successfully")
 
         # 클래스 메서드 확인
         required_methods = [
-            'create_function_namespace',
-            'delete_function_namespace',
-            'namespace_exists',
-            '_apply_resource_quota',
-            '_apply_limit_range',
-            '_apply_network_policy'
+            "create_function_namespace",
+            "delete_function_namespace",
+            "namespace_exists",
+            "_apply_resource_quota",
+            "_apply_limit_range",
+            "_apply_network_policy",
         ]
 
         for method_name in required_methods:
@@ -89,9 +91,9 @@ def test_function_service_integration():
     print("\n=== Test 3: FunctionService Integration ===")
 
     try:
-        from app.services.function_service import FunctionService
-        from app.core.namespace_manager import NamespaceManager
         import inspect
+
+        from app.services.function_service import FunctionService
 
         print("  PASS: FunctionService imported successfully")
 
@@ -99,8 +101,10 @@ def test_function_service_integration():
         init_signature = inspect.signature(FunctionService.__init__)
         params = list(init_signature.parameters.keys())
 
-        if 'namespace_manager' in params:
-            print("  PASS: FunctionService.__init__ accepts namespace_manager parameter")
+        if "namespace_manager" in params:
+            print(
+                "  PASS: FunctionService.__init__ accepts namespace_manager parameter"
+            )
         else:
             print("  FAIL: namespace_manager parameter not found in __init__")
             return False
@@ -109,9 +113,9 @@ def test_function_service_integration():
         create_func_source = inspect.getsource(FunctionService.create_function)
 
         checks = [
-            ('Workspace', 'Workspace model imported'),
-            ('create_function_namespace', 'Namespace creation called'),
-            ('workspace.name', 'Workspace name used'),
+            ("Workspace", "Workspace model imported"),
+            ("create_function_namespace", "Namespace creation called"),
+            ("workspace.name", "Workspace name used"),
         ]
 
         for keyword, description in checks:
@@ -124,7 +128,7 @@ def test_function_service_integration():
         # delete_function 메서드 확인
         delete_func_source = inspect.getsource(FunctionService.delete_function)
 
-        if 'delete_function_namespace' in delete_func_source:
+        if "delete_function_namespace" in delete_func_source:
             print("  PASS: Namespace deletion called in delete_function")
         else:
             print("  FAIL: Namespace deletion not found in delete_function")
@@ -134,6 +138,7 @@ def test_function_service_integration():
     except Exception as e:
         print(f"  FAIL: FunctionService integration check failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -146,8 +151,12 @@ def test_namespace_name_format():
         ("alice-dev", 101, "alice-dev-f-101", True),
         ("my-workspace", 999, "my-workspace-f-999", True),
         ("a", 1, "a-f-1", True),
-        ("12345678901234567890", 12345678901234567890123456789012345678901234,
-         "12345678901234567890-f-12345678901234567890123456789012345678901234", False),  # > 63 chars
+        (
+            "12345678901234567890",
+            12345678901234567890123456789012345678901234,
+            "12345678901234567890-f-12345678901234567890123456789012345678901234",
+            False,
+        ),  # > 63 chars
     ]
 
     passed = 0
@@ -162,11 +171,15 @@ def test_namespace_name_format():
                 print(f"  PASS: '{namespace}' (length: {length})")
                 passed += 1
             else:
-                print(f"  FAIL: '{namespace}' - expected '{expected_namespace}' or length > 63")
+                print(
+                    f"  FAIL: '{namespace}' - expected '{expected_namespace}' or length > 63"
+                )
                 failed += 1
         else:
             if length > 63:
-                print(f"  PASS: '{namespace}' correctly exceeds 63 chars (length: {length})")
+                print(
+                    f"  PASS: '{namespace}' correctly exceeds 63 chars (length: {length})"
+                )
                 passed += 1
             else:
                 print(f"  FAIL: '{namespace}' should exceed 63 chars but is {length}")
@@ -184,11 +197,11 @@ def test_config_settings():
         from app.config import settings
 
         required_settings = {
-            'kubernetes_in_cluster': bool,
-            'kubernetes_config_path': (type(None), str),
-            'namespace_cpu_limit': str,
-            'namespace_memory_limit': str,
-            'namespace_pod_limit': int,
+            "kubernetes_in_cluster": bool,
+            "kubernetes_config_path": (type(None), str),
+            "namespace_cpu_limit": str,
+            "namespace_memory_limit": str,
+            "namespace_pod_limit": int,
         }
 
         passed = 0
@@ -199,17 +212,23 @@ def test_config_settings():
                 value = getattr(settings, setting_name)
                 if isinstance(expected_type, tuple):
                     if type(value) in expected_type:
-                        print(f"  PASS: {setting_name} = {value} (type: {type(value).__name__})")
+                        print(
+                            f"  PASS: {setting_name} = {value} (type: {type(value).__name__})"
+                        )
                         passed += 1
                     else:
-                        print(f"  FAIL: {setting_name} has wrong type: {type(value).__name__}")
+                        print(
+                            f"  FAIL: {setting_name} has wrong type: {type(value).__name__}"
+                        )
                         failed += 1
                 else:
                     if isinstance(value, expected_type):
                         print(f"  PASS: {setting_name} = {value}")
                         passed += 1
                     else:
-                        print(f"  FAIL: {setting_name} has wrong type: {type(value).__name__}")
+                        print(
+                            f"  FAIL: {setting_name} has wrong type: {type(value).__name__}"
+                        )
                         failed += 1
             else:
                 print(f"  FAIL: {setting_name} not found in settings")

@@ -2,7 +2,15 @@ import enum
 import re
 import uuid
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
@@ -45,6 +53,7 @@ class Function(Base):
     - 전역적으로 unique해야 함
     - 최대 100자, URL-safe 문자만 허용
     """
+
     __tablename__ = "functions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -76,10 +85,10 @@ class Function(Base):
 
     # Composite unique constraint: workspace 내에서만 endpoint가 unique
     __table_args__ = (
-        UniqueConstraint('workspace_id', 'endpoint', name='uq_workspace_endpoint'),
+        UniqueConstraint("workspace_id", "endpoint", name="uq_workspace_endpoint"),
     )
 
-    @validates('endpoint')
+    @validates("endpoint")
     def validate_endpoint(self, key, endpoint):
         """
         Function endpoint를 검증
@@ -99,28 +108,28 @@ class Function(Base):
         if not endpoint:
             raise ValueError("Function endpoint cannot be empty")
 
-        if not endpoint.startswith('/'):
+        if not endpoint.startswith("/"):
             raise ValueError("Function endpoint must start with '/'")
 
         if len(endpoint) > 100:
             raise ValueError("Function endpoint must be 100 characters or less")
 
         # URL-safe 문자만 허용: 소문자, 숫자, 하이픈, 슬래시
-        if not re.match(r'^/[a-z0-9/-]+$', endpoint):
+        if not re.match(r"^/[a-z0-9/-]+$", endpoint):
             raise ValueError(
                 "Function endpoint must contain only lowercase letters, numbers, hyphens, and slashes"
             )
 
         # 연속된 하이픈 불가
-        if '--' in endpoint:
+        if "--" in endpoint:
             raise ValueError("Function endpoint cannot contain consecutive hyphens")
 
         # 연속된 슬래시 불가
-        if '//' in endpoint:
+        if "//" in endpoint:
             raise ValueError("Function endpoint cannot contain consecutive slashes")
 
         # 하이픈으로 끝나면 안됨
-        if endpoint.endswith('-'):
+        if endpoint.endswith("-"):
             raise ValueError("Function endpoint cannot end with a hyphen")
 
         return endpoint
