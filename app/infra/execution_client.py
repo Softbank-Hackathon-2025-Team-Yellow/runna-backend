@@ -181,10 +181,7 @@ class ExecutionClient:
             finally:
                 # PubSub 연결 정리
                 if pubsub:
-                    try:
-                        await pubsub.aclose()
-                    except:
-                        pass
+                    await pubsub.aclose()
 
                 # 재연결 대기
                 print("[Callback Listener] Reconnecting in 5 seconds...")

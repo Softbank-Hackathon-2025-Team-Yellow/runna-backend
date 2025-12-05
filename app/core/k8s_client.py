@@ -303,7 +303,7 @@ class K8sClient:
         }
 
         try:
-            response = self.custom_objects.create_cluster_custom_object(
+            self.custom_objects.create_cluster_custom_object(
                 group="networking.internal.knative.dev",
                 version="v1alpha1",
                 plural="clusterdomainclaims",
@@ -382,7 +382,7 @@ class K8sClient:
         }
 
         try:
-            response = self.custom_objects.create_namespaced_custom_object(
+            self.custom_objects.create_namespaced_custom_object(
                 group="serving.knative.dev",
                 version="v1alpha1",
                 namespace=namespace,
@@ -439,7 +439,6 @@ class K8sClient:
         path: str,
         service_name: str,
         gateway_name: str = "3scale-kourier-gateway",
-        gateway_namespace: str = "istio-system",
     ) -> str:
         """
         Gateway API HTTPRoute 생성
@@ -450,7 +449,6 @@ class K8sClient:
             path: 라우팅할 경로 (예: /my-function)
             service_name: 백엔드 KNative Service 이름
             gateway_name: Gateway 이름
-            gateway_namespace: Gateway가 위치한 네임스페이스
 
         Returns:
             생성된 HTTPRoute 이름
@@ -485,7 +483,7 @@ class K8sClient:
         }
 
         try:
-            response = self.custom_objects.create_namespaced_custom_object(
+            self.custom_objects.create_namespaced_custom_object(
                 group="gateway.networking.k8s.io",
                 version="v1",
                 namespace=namespace,

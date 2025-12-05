@@ -2,7 +2,6 @@ import logging
 import uuid
 from typing import Dict, Optional
 
-from kubernetes import client
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -106,11 +105,12 @@ class K8sService:
                 path=function.endpoint,
                 service_name=service_name,
                 gateway_name=settings.gateway_name,
-                gateway_namespace=settings.gateway_namespace,
             )
 
             # 6. 최종 URL 생성
-            function_url = self._generate_function_url(workspace.alias, function.endpoint)
+            function_url = self._generate_function_url(
+                workspace.alias, function.endpoint
+            )
 
             result = {
                 "namespace": namespace,
@@ -149,7 +149,7 @@ class K8sService:
 
         try:
             cleanup_success = True
-            
+
             # 1. ClusterDomainClaim 삭제 (클러스터 수준 리소스)
             try:
                 self.k8s_client.delete_cluster_domain_claim(subdomain)
@@ -226,7 +226,7 @@ class K8sService:
         # 환경변수 설정
         env_list = [
             {"name": "CODE_CONTENT", "value": function.code},
-            {"name": "RUNTIME", "value": function.runtime}
+            {"name": "RUNTIME", "value": function.runtime},
         ]
         if env_vars:
             env_list.extend([{"name": k, "value": v} for k, v in env_vars.items()])
@@ -278,4 +278,3 @@ class K8sService:
                 },
             },
         }
-

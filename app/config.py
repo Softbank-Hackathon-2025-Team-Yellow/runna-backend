@@ -40,16 +40,11 @@ class Settings(BaseSettings):
     kubernetes_config_path: Optional[str] = None  # 로컬 개발용
 
     # K8s 설정
-    k8s_namespace_prefix: str = "runna"
     base_domain: str = "runna.haifu.cloud"
 
     # Runtime별 Docker 이미지
     k8s_python_image: str = "docker.io/runna/python-runtime:latest"
     k8s_nodejs_image: str = "docker.io/runna/nodejs-runtime:latest"
-
-    # 기존 Ingress 설정 (하위 호환성)
-    k8s_ingress_class: str = "nginx"
-    k8s_ingress_domain: str = "runna.dev"
 
     # K8s 리소스 제한
     k8s_cpu_request: str = "100m"
@@ -62,16 +57,12 @@ class Settings(BaseSettings):
     namespace_memory_limit: str = "4Gi"
     namespace_pod_limit: int = 10
 
-    # 외부 Namespace Manager API
-    namespace_manager_url: Optional[str] = None
-
     # KNative 오토스케일링
     knative_min_scale: str = "1"
     knative_max_scale: str = "10"
 
     # Gateway API 설정
-    gateway_name: str = "runna-gateway"
-    gateway_namespace: str = "istio-system"
+    gateway_name: str = "3scale-kourier-gateway"
 
     @field_validator("secret_key", mode="before")
     @classmethod
