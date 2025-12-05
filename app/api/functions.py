@@ -91,8 +91,10 @@ def create_function(
         return create_success_response({"function_id": db_function.id})
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
-    except Exception:
-        return create_error_response("INTERNAL_ERROR", "Internal server error")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("INTERNAL_ERROR", f"Internal server error: {str(e)}")
 
 
 @router.put("/{function_id}")
