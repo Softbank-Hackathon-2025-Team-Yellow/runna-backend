@@ -15,26 +15,29 @@ from app.models.job import Job, JobStatus
 from app.models.workspace import Workspace
 from app.schemas.function import FunctionCreate, FunctionUpdate
 from app.services.k8s_service import K8sService, K8sServiceError
+from app.core.namespace_manager import NamespaceManager
+from app.core.mock_namespace_manager import MockNamespaceManager
 
 logger = logging.getLogger(__name__)
+
 
 class FunctionService:
     def __init__(self, db: Session, namespace_manager=None):
         self.db = db
-        
+
         # NamespaceManager 초기화 (fallback 메커니즘 포함)
         if namespace_manager is None:
             try:
-                from app.core.namespace_manager import NamespaceManager, NamespaceManagerError
                 self.namespace_manager = NamespaceManager()
                 logger.info("FunctionService initialized with real NamespaceManager")
-            except (ImportError, NamespaceManagerError) as e:
-                logger.warning(f"Failed to initialize NamespaceManager, using Mock: {e}")
-                from app.core.mock_namespace_manager import MockNamespaceManager
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize NamespaceManager, using Mock: {e}"
+                )
                 self.namespace_manager = MockNamespaceManager()
         else:
             self.namespace_manager = namespace_manager
-            
+
         self.k8s_service = K8sService(db)
 
     def get_function_by_endpoint(self, endpoint: str) -> Optional[Function]:
