@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, Mock
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,11 +8,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
-from app.dependencies import get_execution_client
+from app.dependencies import get_execution_client, get_current_user, get_workspace_auth
 from app.infra.execution_client import ExecutionClient
-# Import models to register them with SQLAlchemy metadata
 from app.models.function import Function
 from app.models.job import Job
+from app.models.user import User
+from app.models.workspace import Workspace
+from app.schemas.user import UserCreate
+from app.schemas.workspace import WorkspaceCreate
+from app.services.user_service import UserService
+from app.services.workspace_service import WorkspaceService
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
@@ -54,7 +60,35 @@ def mock_exec_client():
 
 
 @pytest.fixture
-def client(db_session, mock_exec_client):
+def test_user(db_session):
+    """
+    테스트용 사용자 생성
+    """
+    user_service = UserService(db_session)
+    unique_id = str(uuid.uuid4())[:8]
+    user_data = UserCreate(
+        username=f"test_user_{unique_id}",
+        name="Test User",
+        password="test_password"
+    )
+    user = user_service.create_user(user_data)
+    return user
+
+
+@pytest.fixture
+def test_workspace(db_session, test_user):
+    """
+    테스트용 워크스페이스 생성
+    """
+    workspace_service = WorkspaceService(db_session)
+    unique_id = str(uuid.uuid4())[:8]
+    workspace_data = WorkspaceCreate(name=f"test_workspace_{unique_id}")
+    workspace = workspace_service.create_workspace(workspace_data, test_user.id)
+    return workspace
+
+
+@pytest.fixture
+def client(db_session, mock_exec_client, test_user, test_workspace):
     """
     FastAPI TestClient with dependency overrides.
 
@@ -77,6 +111,8 @@ def client(db_session, mock_exec_client):
     # Override dependencies with test instances
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_execution_client] = lambda: mock_exec_client
+    app.dependency_overrides[get_current_user] = lambda: test_user
+    app.dependency_overrides[get_workspace_auth] = lambda: test_workspace
 
     with TestClient(app) as test_client:
         yield test_client

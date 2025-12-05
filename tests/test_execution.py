@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 
-def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
+def test_invoke_sync_function_success(client: TestClient, mock_exec_client, test_workspace):
     # Create a function first
     function_data = {
         "name": "test_sync_function",
@@ -33,7 +33,7 @@ def test_invoke_sync_function_success(client: TestClient, mock_exec_client):
     assert data["data"]["function_id"] == function_id
 
 
-def test_invoke_sync_function_failure(client: TestClient, mock_exec_client):
+def test_invoke_sync_function_failure(client: TestClient, mock_exec_client, test_workspace):
     # Create a function first
     function_data = {
         "name": "test_sync_function",
@@ -63,7 +63,7 @@ def test_invoke_sync_function_failure(client: TestClient, mock_exec_client):
     assert data["data"]["result"] is not None  # Error message stored
 
 
-def test_invoke_async_function(client: TestClient, mock_exec_client):
+def test_invoke_async_function(client: TestClient, mock_exec_client, test_workspace):
     # Create an async function
     function_data = {
         "name": "test_async_function",
@@ -92,7 +92,7 @@ def test_invoke_async_function(client: TestClient, mock_exec_client):
     assert "job_id" in data["data"]
 
 
-def test_get_function_jobs(client: TestClient, mock_exec_client):
+def test_get_function_jobs(client: TestClient, mock_exec_client, test_workspace):
     # Create a function
     function_data = {
         "name": "test_function_jobs",
@@ -125,7 +125,7 @@ def test_get_function_jobs(client: TestClient, mock_exec_client):
     assert data["data"]["jobs"][0]["status"] == "success"  # JobStatus.SUCCESS
 
 
-def test_get_job(client: TestClient, mock_exec_client):
+def test_get_job(client: TestClient, mock_exec_client, test_workspace):
     # Create a function
     function_data = {
         "name": "test_get_job",
