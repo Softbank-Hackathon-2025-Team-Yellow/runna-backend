@@ -5,12 +5,15 @@ from sqlalchemy.orm import Session
 from app.core.static_analysis import analyzer
 from app.models.function import Function
 from app.models.job import Job, JobStatus
+from app.models.workspace import Workspace
 from app.schemas.function import FunctionCreate, FunctionUpdate
+from app.services.k8s_service import K8sService, K8sServiceError
 
 
 class FunctionService:
     def __init__(self, db: Session):
         self.db = db
+        self.k8s_service = K8sService(db)
 
     def create_function(self, function_data: FunctionCreate) -> Function:
         analysis_result = self._analyze_code(
@@ -70,6 +73,21 @@ class FunctionService:
         if not db_function:
             return False
 
+        # Get workspace for K8s cleanup
+        workspace = (
+            self.db.query(Workspace)
+            .filter(Workspace.id == db_function.workspace_id)
+            .first()
+        )
+
+        try:
+            # K8s 리소스 정리 (실패해도 DB 정리는 계속 진행)
+            if workspace:
+                self.k8s_service.cleanup_function_resources(db_function, workspace)
+        except K8sServiceError as e:
+            # K8s 정리 실패는 로그만 남기고 계속 진행
+            print(f"Failed to cleanup K8s resources: {e}")
+
         # Delete the function and related jobs
         self.db.query(Job).filter(Job.function_id == function_id).delete()
         self.db.delete(db_function)
@@ -109,6 +127,70 @@ class FunctionService:
             "cpu_usage": "70%",  # TODO: Get from monitoring system
             "memory_usage": "256MB",  # TODO: Get from monitoring system
         }
+
+    def deploy_function_to_k8s(
+        self,
+        function_id: int,
+        custom_path: str,
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, str]:
+        """
+        함수를 Kubernetes에 배포
+
+        Args:
+            function_id: 배포할 함수 ID
+            custom_path: 사용자 정의 경로
+            env_vars: 추가 환경변수 (선택사항)
+
+        Returns:
+            배포 결과 정보
+
+        Raises:
+            ValueError: 함수 또는 워크스페이스를 찾을 수 없는 경우
+            K8sServiceError: K8s 배포 실패 시
+        """
+        function = self.get_function(function_id)
+        if not function:
+            raise ValueError(f"Function with id {function_id} not found")
+
+        workspace = (
+            self.db.query(Workspace)
+            .filter(Workspace.id == function.workspace_id)
+            .first()
+        )
+        if not workspace:
+            raise ValueError(f"Workspace for function {function_id} not found")
+
+        return self.k8s_service.deploy_function(
+            function=function,
+            workspace=workspace,
+            custom_path=custom_path,
+            env_vars=env_vars,
+        )
+
+    def get_function_deployment_status(self, function_id: int) -> Optional[Dict]:
+        """
+        함수 배포 상태 확인
+
+        Args:
+            function_id: 상태를 확인할 함수 ID
+
+        Returns:
+            배포 상태 정보 또는 None
+        """
+        function = self.get_function(function_id)
+        if not function:
+            return None
+
+        workspace = (
+            self.db.query(Workspace)
+            .filter(Workspace.id == function.workspace_id)
+            .first()
+        )
+        if not workspace:
+            return None
+
+        return self.k8s_service.get_function_status(function, workspace)
 
     def _analyze_code(self, code: str, runtime: str) -> dict:
         if runtime == "python":
