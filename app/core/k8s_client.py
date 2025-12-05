@@ -4,6 +4,8 @@ from typing import Dict, Optional
 from kubernetes import client, config
 from kubernetes.client import ApiException
 
+from app.core.k8s_manifests import ManifestBuilder
+
 logger = logging.getLogger(__name__)
 
 
@@ -294,13 +296,7 @@ class K8sClient:
         Raises:
             K8sClientError: 생성 실패 시
         """
-
-        manifest = {
-            "apiVersion": "networking.internal.knative.dev/v1alpha1",
-            "kind": "ClusterDomainClaim",
-            "metadata": {"name": domain},
-            "spec": {"namespace": namespace},
-        }
+        manifest = ManifestBuilder.build_cluster_domain_claim_manifest(domain, namespace)
 
         try:
             self.custom_objects.create_cluster_custom_object(
@@ -367,19 +363,7 @@ class K8sClient:
         Raises:
             K8sClientError: 생성 실패 시
         """
-
-        manifest = {
-            "apiVersion": "serving.knative.dev/v1alpha1",
-            "kind": "DomainMapping",
-            "metadata": {"name": domain, "namespace": namespace},
-            "spec": {
-                "ref": {
-                    "name": service_name,
-                    "kind": "Service",
-                    "apiVersion": "serving.knative.dev/v1",
-                }
-            },
-        }
+        manifest = ManifestBuilder.build_domain_mapping_manifest(domain, namespace, service_name)
 
         try:
             self.custom_objects.create_namespaced_custom_object(
@@ -456,31 +440,10 @@ class K8sClient:
         Raises:
             K8sClientError: 생성 실패 시
         """
-        route_name = f"{service_name}-route"
-
-        manifest = {
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "HTTPRoute",
-            "metadata": {"name": route_name, "namespace": namespace},
-            "spec": {
-                "parentRefs": [{"name": gateway_name}],
-                "hostnames": [hostname],
-                "rules": [
-                    {
-                        "matches": [{"path": {"type": "PathPrefix", "value": path}}],
-                        "backendRefs": [
-                            {
-                                "name": service_name,
-                                "port": 80,
-                                "kind": "Service",
-                                "group": "serving.knative.dev",
-                                "weight": 100,
-                            }
-                        ],
-                    }
-                ],
-            },
-        }
+        manifest = ManifestBuilder.build_http_route_manifest(
+            namespace, hostname, path, service_name, gateway_name
+        )
+        route_name = ManifestBuilder.generate_route_name(service_name)
 
         try:
             self.custom_objects.create_namespaced_custom_object(

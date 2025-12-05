@@ -1,11 +1,11 @@
 import logging
-import uuid
 from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.k8s_client import K8sClient, K8sClientError
+from app.core.k8s_manifests import ManifestBuilder
 from app.core.sanitize import create_safe_namespace_name
 from app.models.function import Function
 from app.models.workspace import Workspace
@@ -75,11 +75,14 @@ class K8sService:
             )
 
             # 2. KNative Service 배포
-            knative_manifest = self._build_knative_manifest(
-                function=function,
-                namespace=namespace,
-                env_vars=env_vars,
-            )
+            try:
+                knative_manifest = ManifestBuilder.build_knative_service_manifest(
+                    function=function,
+                    namespace=namespace,
+                    env_vars=env_vars,
+                )
+            except ValueError as e:
+                raise K8sServiceError(str(e))
 
             service_name = self.k8s_client.create_knative_service(
                 namespace=namespace, manifest=knative_manifest
@@ -206,75 +209,3 @@ class K8sService:
         subdomain = self._generate_subdomain(workspace_alias)
         return f"https://{subdomain}{endpoint}"
 
-    def _build_knative_manifest(
-        self,
-        function: Function,
-        namespace: str,
-        env_vars: Optional[Dict[str, str]] = None,
-    ) -> Dict:
-        """KNative Service 매니페스트 생성"""
-        revision_name = f"{function.name}-{uuid.uuid4().hex[:8]}"
-
-        # Runtime별 Docker 이미지 선택
-        if function.runtime == "PYTHON":
-            docker_image = settings.k8s_python_image
-        elif function.runtime == "NODEJS":
-            docker_image = settings.k8s_nodejs_image
-        else:
-            raise K8sServiceError(f"Unsupported runtime: {function.runtime}")
-
-        # 환경변수 설정
-        env_list = [
-            {"name": "CODE_CONTENT", "value": function.code},
-            {"name": "RUNTIME", "value": function.runtime},
-        ]
-        if env_vars:
-            env_list.extend([{"name": k, "value": v} for k, v in env_vars.items()])
-
-        return {
-            "apiVersion": "serving.knative.dev/v1",
-            "kind": "Service",
-            "metadata": {
-                "name": function.name,
-                "namespace": namespace,
-                "labels": {
-                    "app": "runna",
-                    "workspace": function.workspace.alias,
-                    "function": function.name,
-                },
-            },
-            "spec": {
-                "template": {
-                    "metadata": {
-                        "name": revision_name,
-                        "annotations": {
-                            "autoscaling.knative.dev/minScale": (
-                                settings.knative_min_scale
-                            ),
-                            "autoscaling.knative.dev/maxScale": (
-                                settings.knative_max_scale
-                            ),
-                        },
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "name": "user-container",
-                                "image": docker_image,
-                                "resources": {
-                                    "requests": {
-                                        "cpu": settings.k8s_cpu_request,
-                                        "memory": settings.k8s_memory_request,
-                                    },
-                                    "limits": {
-                                        "cpu": settings.k8s_cpu_limit,
-                                        "memory": settings.k8s_memory_limit,
-                                    },
-                                },
-                                "env": env_list,
-                            }
-                        ],
-                    },
-                },
-            },
-        }
