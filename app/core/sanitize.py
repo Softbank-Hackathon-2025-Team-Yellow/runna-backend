@@ -283,7 +283,12 @@ def sanitize_workspace_alias(name: str, db: Optional[Session] = None, max_attemp
     return alias
 
 
-def sanitize_function_endpoint(name: str, db: Optional[Session] = None, max_attempts: int = 10) -> str:
+def sanitize_function_endpoint(
+    name: str,
+    workspace_id=None,
+    db: Optional[Session] = None,
+    max_attempts: int = 10
+) -> str:
     """
     Function name을 기반으로 안전한 endpoint를 생성합니다.
 
@@ -292,6 +297,7 @@ def sanitize_function_endpoint(name: str, db: Optional[Session] = None, max_atte
 
     Args:
         name: 원본 function 이름
+        workspace_id: Workspace ID (workspace 내 중복 검사용, 선택적)
         db: 중복 검사를 위한 데이터베이스 세션 (선택적)
         max_attempts: 중복 해결을 위한 최대 시도 횟수
 
@@ -334,7 +340,16 @@ def sanitize_function_endpoint(name: str, db: Optional[Session] = None, max_atte
 
         base_endpoint = endpoint
         for attempt in range(1, max_attempts + 1):
-            existing = db.query(Function).filter(Function.endpoint == endpoint).first()
+            # Workspace 내 중복 검사
+            if workspace_id:
+                existing = db.query(Function).filter(
+                    Function.workspace_id == workspace_id,
+                    Function.endpoint == endpoint
+                ).first()
+            else:
+                # workspace_id가 없으면 전역 검사 (하위 호환성)
+                existing = db.query(Function).filter(Function.endpoint == endpoint).first()
+
             if not existing:
                 break
 

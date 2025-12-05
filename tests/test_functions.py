@@ -209,3 +209,117 @@ def test_create_valid_nodejs_function(client: TestClient, test_workspace):
     data = response.json()
     assert data["success"] is True
     assert "function_id" in data["data"]
+
+
+def test_endpoint_unique_per_workspace(client: TestClient, db_session, test_user):
+    """다른 workspace에서는 같은 endpoint 사용 가능"""
+    from app.services.workspace_service import WorkspaceService
+    from app.schemas.workspace import WorkspaceCreate
+
+    workspace_service = WorkspaceService(db_session)
+
+    # Create two workspaces
+    workspace1 = workspace_service.create_workspace(
+        WorkspaceCreate(name="workspace-1"), test_user.id
+    )
+    workspace2 = workspace_service.create_workspace(
+        WorkspaceCreate(name="workspace-2"), test_user.id
+    )
+
+    # Create function with /hello in workspace1 - should succeed
+    function_data_1 = {
+        "name": "test_function",
+        "runtime": "PYTHON",
+        "code": "def handler(event): return event",
+        "execution_type": "SYNC",
+        "workspace_id": str(workspace1.id),
+        "endpoint": "/hello",
+    }
+
+    response1 = client.post("/functions/", json=function_data_1)
+    assert response1.status_code == 200
+    assert response1.json()["success"] is True
+
+    # Create function with /hello in workspace2 - should succeed (different workspace)
+    function_data_2 = {
+        "name": "test_function",
+        "runtime": "PYTHON",
+        "code": "def handler(event): return event",
+        "execution_type": "SYNC",
+        "workspace_id": str(workspace2.id),
+        "endpoint": "/hello",
+    }
+
+    response2 = client.post("/functions/", json=function_data_2)
+    assert response2.status_code == 200
+    assert response2.json()["success"] is True
+
+    # Create function with /hello in workspace1 again - should fail (same workspace)
+    function_data_3 = {
+        "name": "another_function",
+        "runtime": "PYTHON",
+        "code": "def handler(event): return event",
+        "execution_type": "SYNC",
+        "workspace_id": str(workspace1.id),
+        "endpoint": "/hello",
+    }
+
+    response3 = client.post("/functions/", json=function_data_3)
+    assert response3.status_code == 200
+    data = response3.json()
+    assert data["success"] is False
+    assert "already exists" in data["error"]["message"].lower()
+
+
+def test_endpoint_auto_generated_per_workspace(client: TestClient, db_session, test_user):
+    """같은 이름의 function이 다른 workspace에서 자동 생성된 endpoint 사용 가능"""
+    from app.services.workspace_service import WorkspaceService
+    from app.schemas.workspace import WorkspaceCreate
+
+    workspace_service = WorkspaceService(db_session)
+
+    # Create two workspaces
+    workspace1 = workspace_service.create_workspace(
+        WorkspaceCreate(name="ws-alpha"), test_user.id
+    )
+    workspace2 = workspace_service.create_workspace(
+        WorkspaceCreate(name="ws-beta"), test_user.id
+    )
+
+    # Create function named "test" in workspace1 - endpoint should be /test
+    function_data_1 = {
+        "name": "test",
+        "runtime": "PYTHON",
+        "code": "def handler(event): return event",
+        "execution_type": "SYNC",
+        "workspace_id": str(workspace1.id),
+    }
+
+    response1 = client.post("/functions/", json=function_data_1)
+    assert response1.status_code == 200
+    data1 = response1.json()
+    assert data1["success"] is True
+
+    # Get the function and check endpoint
+    function_id_1 = data1["data"]["function_id"]
+    get_response_1 = client.get(f"/functions/{function_id_1}")
+    assert get_response_1.json()["data"]["endpoint"] == "/test"
+
+    # Create function named "test" in workspace2 - endpoint should also be /test (different workspace)
+    function_data_2 = {
+        "name": "test",
+        "runtime": "PYTHON",
+        "code": "def handler(event): return event",
+        "execution_type": "SYNC",
+        "workspace_id": str(workspace2.id),
+    }
+
+    response2 = client.post("/functions/", json=function_data_2)
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert data2["success"] is True
+
+    # Get the function and check endpoint - should be /test, not /test-2
+    function_id_2 = data2["data"]["function_id"]
+    get_response_2 = client.get(f"/functions/{function_id_2}")
+    assert get_response_2.json()["data"]["endpoint"] == "/test"

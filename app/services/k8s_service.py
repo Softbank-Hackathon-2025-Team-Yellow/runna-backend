@@ -6,7 +6,7 @@ from kubernetes import client
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.k8s_client import K8sClient, MockK8sClient, K8sClientError
+from app.core.k8s_client import K8sClient, K8sClientError
 from app.models.function import Function
 from app.models.workspace import Workspace
 

@@ -2,7 +2,7 @@ import enum
 import re
 import uuid
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
@@ -41,7 +41,7 @@ class Function(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(255), unique=False, index=True, nullable=False)
-    endpoint = Column(String(100), unique=True, nullable=False, index=True)
+    endpoint = Column(String(100), nullable=False, index=True)  # unique=True 제거
     runtime = Column(Enum(Runtime), nullable=False)
     code = Column(Text, nullable=False)
     execution_type = Column(Enum(ExecutionType), nullable=False)
@@ -54,6 +54,11 @@ class Function(Base):
     # Relationships
     jobs = relationship("Job", back_populates="function")
     workspace = relationship("Workspace", back_populates="functions")
+
+    # Composite unique constraint: workspace 내에서만 endpoint가 unique
+    __table_args__ = (
+        UniqueConstraint('workspace_id', 'endpoint', name='uq_workspace_endpoint'),
+    )
 
     @validates('endpoint')
     def validate_endpoint(self, key, endpoint):

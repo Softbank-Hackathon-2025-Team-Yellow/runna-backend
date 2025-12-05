@@ -38,8 +38,21 @@ class FunctionService:
         self.k8s_service = K8sService(db)
 
     def get_function_by_endpoint(self, endpoint: str) -> Optional[Function]:
-        """endpoint로 Function 조회"""
+        """endpoint로 Function 조회 (전역 검색 - 하위 호환성용)"""
         return self.db.query(Function).filter(Function.endpoint == endpoint).first()
+
+    def get_function_by_workspace_and_endpoint(
+        self, workspace_id, endpoint: str
+    ) -> Optional[Function]:
+        """Workspace 내에서 endpoint로 Function 조회"""
+        return (
+            self.db.query(Function)
+            .filter(
+                Function.workspace_id == workspace_id,
+                Function.endpoint == endpoint
+            )
+            .first()
+        )
 
     def create_function(self, function_data: FunctionCreate) -> Function:
         # 1. 코드 분석
@@ -56,13 +69,16 @@ class FunctionService:
         if function_data.endpoint and function_data.endpoint.strip():
             # 사용자가 custom endpoint 제공 (빈 문자열 제외)
             endpoint = validate_custom_endpoint(function_data.endpoint)
-            # 중복 확인
-            if self.get_function_by_endpoint(endpoint):
-                raise ValueError(f"Endpoint '{endpoint}' already exists")
+            # Workspace 내 중복 확인
+            if self.get_function_by_workspace_and_endpoint(function_data.workspace_id, endpoint):
+                raise ValueError(f"Endpoint '{endpoint}' already exists in this workspace")
         else:
-            # 자동 생성 (중복 시 suffix 자동 추가)
+            # 자동 생성 (workspace 내 중복 시 suffix 자동 추가)
             endpoint = sanitize_function_endpoint(
-                function_data.name, db=self.db, max_attempts=10
+                function_data.name,
+                workspace_id=function_data.workspace_id,
+                db=self.db,
+                max_attempts=10
             )
 
         # 3. DB에 Function 생성
@@ -137,10 +153,12 @@ class FunctionService:
         # endpoint 검증 및 변경
         if "endpoint" in update_data:
             new_endpoint = validate_custom_endpoint(update_data["endpoint"])
-            # 중복 확인 (자신 제외)
-            existing = self.get_function_by_endpoint(new_endpoint)
+            # Workspace 내 중복 확인 (자신 제외)
+            existing = self.get_function_by_workspace_and_endpoint(
+                db_function.workspace_id, new_endpoint
+            )
             if existing and existing.id != db_function.id:
-                raise ValueError(f"Endpoint '{new_endpoint}' already exists")
+                raise ValueError(f"Endpoint '{new_endpoint}' already exists in this workspace")
             update_data["endpoint"] = new_endpoint
 
         for field, value in update_data.items():

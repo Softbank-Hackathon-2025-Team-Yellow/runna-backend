@@ -7,6 +7,11 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class NamespaceManagerError(Exception):
+    """NamespaceManager 관련 예외"""
+    pass
+
+
 class NamespaceManager:
     """
     Kubernetes Namespace 생성 및 관리
@@ -26,7 +31,7 @@ class NamespaceManager:
                 config.load_kube_config(settings.kubernetes_config_path)  # 로컬
         except Exception as e:
             logger.error(f"Failed to load Kubernetes config: {e}")
-            raise
+            raise NamespaceManagerError(f"Failed to initialize Kubernetes client: {e}") from e
 
         self.core_v1 = client.CoreV1Api()
         self.networking_v1 = client.NetworkingV1Api()
