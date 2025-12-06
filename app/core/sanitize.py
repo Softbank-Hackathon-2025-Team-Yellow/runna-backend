@@ -69,23 +69,6 @@ def sanitize_workspace_name(name: str, strict: bool = True) -> str:
         else:
             name = "".join(c for c in name if ord(c) >= 32 and ord(c) != 127)
 
-    # 소문자로 변환 (Kubernetes 요구사항)
-    name = name.lower()
-
-    # Kubernetes DNS-1123 label 요구사항 확인
-    # 소문자 영숫자 문자 또는 '-'로만 구성되어야 함
-    if not re.match(r"^[a-z0-9-]+$", name):
-        if strict:
-            raise SanitizationError(
-                "Workspace 이름은 소문자, 숫자, 하이픈만 포함해야 합니다. "
-                f"유효하지 않은 문자가 포함됨: '{name}'"
-            )
-        else:
-            # 유효하지 않은 문자를 하이픈으로 교체
-            name = re.sub(r"[^a-z0-9-]", "-", name)
-            # 연속된 하이픈 제거
-            name = re.sub(r"-+", "-", name)
-
     # 하이픈으로 시작하거나 끝나면 안됨
     if name.startswith("-") or name.endswith("-"):
         if strict:

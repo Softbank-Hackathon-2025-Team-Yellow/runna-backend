@@ -106,10 +106,10 @@ class FunctionService:
             self.db.commit()
             raise ValueError("Workspace not found")
 
-        # 5. Namespace 생성
+        # 5. Namespace 생성 (function 생성 시점에만 수행)
         try:
-            namespace = self.namespace_manager.create_function_namespace(
-                workspace.name,
+            namespace = self.k8s_service.create_namespace(
+                workspace.alias,
                 str(db_function.id),  # UUID를 문자열로 변환
             )
             logger.info(f"Created namespace {namespace} for function {db_function.id}")

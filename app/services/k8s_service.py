@@ -38,6 +38,42 @@ class K8sService:
 
             self.k8s_client = MockK8sClient()
 
+    def create_namespace(
+        self, workspace_alias: str, function_id: str
+    ) -> str:
+        """
+        Function을 위한 Namespace 생성
+
+        Args:
+            workspace_alias: 워크스페이스 별칭
+            function_id: 함수 ID
+
+        Returns:
+            생성된 namespace 이름
+
+        Raises:
+            K8sServiceError: namespace 생성 실패 시
+        """
+        try:
+            namespace_name = create_safe_namespace_name(workspace_alias, function_id)
+
+            namespace_labels = {
+                "app": "runna",
+                "workspace": workspace_alias,
+                "function-id": function_id,
+            }
+
+            namespace = self.k8s_client.create_namespace(
+                name=namespace_name, labels=namespace_labels
+            )
+            logger.info(f"Created namespace {namespace} for function {function_id}")
+            return namespace
+
+        except K8sClientError as e:
+            error_msg = f"Failed to create namespace for function {function_id}: {str(e)}"
+            logger.error(error_msg)
+            raise K8sServiceError(error_msg)
+
     def deploy_function(
         self,
         function: Function,
@@ -59,20 +95,22 @@ class K8sService:
             K8sServiceError: 배포 중 오류 발생 시
         """
         try:
-            # 1. Namespace 생성
+            # 1. Namespace 확인 (이미 create_function에서 생성되었음)
             namespace_name = create_safe_namespace_name(
                 workspace.alias, str(function.id)
             )
 
-            namespace_labels = {
-                "app": "runna",
-                "workspace": workspace.alias,
-                "function-id": str(function.id),
-            }
-
-            namespace = self.k8s_client.create_namespace(
-                name=namespace_name, labels=namespace_labels
-            )
+            # Namespace 존재 여부 확인
+            try:
+                self.k8s_client.v1_core.read_namespace(name=namespace_name)
+                namespace = namespace_name
+                logger.info(f"Using existing namespace: {namespace}")
+            except Exception:
+                # Namespace가 없으면 에러 발생
+                raise K8sServiceError(
+                    f"Namespace {namespace_name} not found. "
+                    "Function must be created before deployment."
+                )
 
             # 2. KNative Service 배포
             try:

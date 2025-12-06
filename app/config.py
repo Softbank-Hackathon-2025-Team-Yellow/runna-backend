@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     base_domain: str = "runna.haifu.cloud"
 
     # Runtime별 Docker 이미지
-    k8s_python_image: str = "docker.io/runna/python-runtime:latest"
-    k8s_nodejs_image: str = "docker.io/runna/nodejs-runtime:latest"
+    k8s_python_image: str = "docker.io/sbyellow/python-runtime:latest"
+    k8s_nodejs_image: str = "docker.io/sbyellow/node-runner:v1"
 
     # K8s 리소스 제한
     k8s_cpu_request: str = "100m"
