@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Gateway API 설정
     gateway_name: str = "3scale-kourier-gateway"
 
+    # Prometheus 메트릭 수집
+    prometheus_url: str = "http://knative-kube-prometheus-st-prometheus.observability.svc.cluster.local:9090"
+
     @field_validator("secret_key", mode="before")
     @classmethod
     def generate_secret_key(cls, v):
