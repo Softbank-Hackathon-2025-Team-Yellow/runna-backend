@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.job import JobType
 from app.schemas.job import JobResponse
 from app.services.job_service import JobService
-from app.infra.deployment_client import DeploymentClient
+
 
 router = APIRouter()
 
@@ -33,13 +33,9 @@ def get_job(
     job_response = JobResponse.model_validate(job)
     response_data = job_response.model_dump()
     
-    # DEPLOYMENT Job의 경우 Future에서 실시간 상태 확인
-    if job.job_type == JobType.DEPLOYMENT:
-        deployment_client = DeploymentClient()
-        live_status = deployment_client.get_deployment_status(id)
-        
-        # Future에 상태가 있으면 우선 사용
-        if live_status:
-            response_data["status"] = live_status
+    
+    # DEPLOYMENT Job 제거됨, 일반 Job 처럼 DB 조회 결과만 반환
+    # (JobType.DEPLOYMENT는 이제 존재하지 않거나 사용되지 않음)
+
     
     return create_success_response(response_data)

@@ -25,7 +25,6 @@ class JobStatus(str, enum.Enum):
 class JobType(str, enum.Enum):
     """Job 타입"""
     EXECUTION = "EXECUTION"  # 함수 실행
-    DEPLOYMENT = "DEPLOYMENT"  # 배포 작업
 
 
 class Job(Base):

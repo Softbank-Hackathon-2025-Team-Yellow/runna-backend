@@ -24,7 +24,7 @@ from app.services.execution_service import ExecutionService
 from app.services.function_service import FunctionService
 from app.services.job_service import JobService
 from app.services.workspace_service import WorkspaceService
-from app.infra.deployment_client import DeploymentClient
+from app.services.workspace_service import WorkspaceService
 
 router = APIRouter()
 
@@ -295,23 +295,23 @@ async def deploy_function(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Function을 K8s 클러스터에 비동기로 배포 (Future 기반)
-
-    - Job을 생성하고 즉시 job_id 반환
-    - 백그라운드에서 배포 실행 (asyncio.create_task)
-    - GET /jobs/{job_id} 또는 GET /functions/{function_id}/deployment로 상태 조회
-
+    Function을 K8s 클러스터에 동기적으로 배포
+    
+    배포가 완료될 때까지 대기 후 결과 반환.
+    
     Args:
         function_id: 배포할 Function ID
         deploy_request: 배포 요청 (환경변수 등)
 
     Returns:
-        Job ID와 PENDING 상태
+        배포 성공 시: {"status": "SUCCESS", "knative_url": "...", "message": "..."}
+        배포 실패 시: {"success": false, "error": {...}}
 
     Raises:
         VALIDATION_ERROR: 코드가 비어있거나 정적 분석 실패
         ACCESS_DENIED: 권한 없음
         WORKSPACE_NOT_FOUND: Workspace 없음
+        DEPLOYMENT_FAILED: K8s 배포 실패
     """
     try:
         # 1. Function 조회 및 권한 검증
@@ -365,42 +365,66 @@ async def deploy_function(
         # 6. Custom path 설정 (endpoint 사용)
         custom_path = function.endpoint  # "/hello" → ingress path
 
-        # 7. Deployment Job 생성
-        import json
-        from app.models.job import Job, JobStatus, JobType
-        
-        job = Job(
-            function_id=function_id,
-            job_type=JobType.DEPLOYMENT,
-            status=JobStatus.PENDING
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # 8. Future 생성 및 등록
-        import asyncio
-        deployment_client = DeploymentClient()
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-        deployment_client.deployment_futures[job.id] = future
+    # ... (imports and previous checks remain same) ...
 
-        # 9. 백그라운드 작업 시작 (asyncio.create_task 사용)
-        asyncio.create_task(
-            deployment_client.deploy_async(
-                job_id=job.id,
+        # 7. Function 상태: DEPLOYING으로 변경
+        from app.models.function import DeploymentStatus
+        
+        function.deployment_status = DeploymentStatus.DEPLOYING
+        function.deployment_error = None
+        
+        db.commit()
+        
+        try:
+            # 8. 동기 배포 실행 (FunctionService 직접 호출)
+            # K8s API 호출 등 블로킹 가능성이 있으므로 to_thread 고려 가능하나,
+            # FunctionService 자체가 동기라면 여기서 await 없이 호출하거나 
+            # asyncio.to_thread로 감싸서 실행.
+            
+            # FunctionService는 현재 동기로 작성되어 있다고 가정.
+            # 만약 FunctionService.deploy_function_to_k8s가 blocking이면 
+            # 전체 서버가 멈출 수 있으므로 thread pool에서 실행하는 것이 안전함.
+            import asyncio
+            from app.services.function_service import FunctionService
+            
+            function_service = FunctionService(db)
+            
+            deploy_result = await asyncio.to_thread(
+                function_service.deploy_function_to_k8s,
                 function_id=function_id,
                 custom_path=custom_path,
                 env_vars=deploy_request.env_vars
             )
-        )
-        
-        # 10. 즉시 응답
-        return create_success_response({
-            "job_id": job.id,
-            "status": "PENDING",
-            "message": "Deployment started in background. Check status with GET /jobs/{job_id}"
-        })
+            
+            # 9. 성공 처리
+            function.deployment_status = DeploymentStatus.DEPLOYED
+            function.knative_url = deploy_result["ingress_url"]
+            from datetime import datetime
+            function.last_deployed_at = datetime.utcnow()
+            function.deployment_error = None
+            
+            db.commit()
+            
+            return create_success_response({
+                "status": "SUCCESS",
+                "knative_url": function.knative_url,
+                "message": "Deployment successful"
+            })
+            
+        except Exception as e:
+            # 실패 처리
+            db.rollback() # 혹시 모를 트랜잭션 정리
+            
+            # 새 세션이나 현재 세션에서 상태 업데이트
+            function.deployment_status = DeploymentStatus.FAILED
+            function.deployment_error = str(e)
+            
+            db.commit()
+            
+            import traceback
+            traceback.print_exc()
+            
+            return create_error_response("DEPLOYMENT_FAILED", f"Deployment failed: {str(e)}")
 
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
