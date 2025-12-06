@@ -260,17 +260,8 @@ def sanitize_workspace_alias(
     if not name:
         raise SanitizationError("Workspace 이름은 비어있을 수 없습니다")
 
-    # 1. 기본 정규화
-    alias = name.strip().lower()
-
-    # 2. 특수문자를 하이픈으로 변환
-    alias = re.sub(r"[^a-z0-9-]", "-", alias)
-
-    # 3. 연속된 하이픈 제거
-    alias = re.sub(r"-+", "-", alias)
-
-    # 4. 앞뒤 하이픈 제거
-    alias = alias.strip("-")
+    # 1~4. 기본 정규화
+    alias = slugify(name)
 
     # 5. 최대 20자 제한
     if len(alias) > 20:
@@ -332,18 +323,8 @@ def sanitize_function_endpoint(
     if not name:
         raise SanitizationError("Function 이름은 비어있을 수 없습니다")
 
-    # 1. 기본 정규화
-    endpoint = name.strip().lower()
-
-    # 2. 특수문자를 하이픈으로 변환
-    endpoint = re.sub(r"[^a-z0-9-/]", "-", endpoint)
-
-    # 3. 연속된 하이픈/슬래시 제거
-    endpoint = re.sub(r"-+", "-", endpoint)
-    endpoint = re.sub(r"/+", "/", endpoint)
-
-    # 4. 앞뒤 하이픈/슬래시 제거
-    endpoint = endpoint.strip("-").strip("/")
+    # 1~4. 기본 정규화
+    endpoint = slugify(name)
 
     # 5. 최대 99자 제한 (/ prefix를 위해 1자 남김)
     if len(endpoint) > 99:
@@ -448,3 +429,21 @@ def validate_custom_endpoint(endpoint: str) -> str:
         raise SanitizationError("Endpoint는 /만으로 구성될 수 없습니다")
 
     return endpoint
+
+
+def slugify(s) -> str:
+
+    # 1. 기본 정규화
+    s = s.strip().lower()
+
+    # 2. 특수문자를 하이픈으로 변환
+    s = re.sub(r"[^a-z0-9-/]", "-", s)
+
+    # 3. 연속된 하이픈/슬래시 제거
+    s = re.sub(r"-+", "-", s)
+    s = re.sub(r"/+", "/", s)
+
+    # 4. 앞뒤 하이픈/슬래시 제거
+    s = s.strip("-").strip("/")
+
+    return s

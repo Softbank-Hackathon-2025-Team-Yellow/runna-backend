@@ -120,28 +120,25 @@ class K8sService:
             except ValueError as e:
                 raise K8sServiceError(str(e))
 
-            service_name = self.k8s_client.create_knative_service(
+            response = self.k8s_client.create_knative_service(
                 namespace=namespace, manifest=knative_manifest
             )
 
-            subdomain = self._generate_subdomain(workspace.alias)
-            
-            # 3. ClusterDomainClaim은 이미 workspace 생성 시 생성됨 (생략)
-
-            # 4. DomainMapping 생성
-            domain_mapping_name = self.k8s_client.create_domain_mapping(
-                namespace=namespace,
-                domain=subdomain,
-                service_name=service_name,
+            service_name = response["metadata"]["name"]
+            service_hostname = self._generate_knative_service_url(
+                service_name, namespace
             )
+
+            # 2. DomainMapping 생성
+
+            subdomain = self._generate_subdomain(workspace.alias)
 
             # 5. HTTPRoute 생성 (Gateway API)
             http_route_name = self.k8s_client.create_http_route(
-                namespace=namespace,
                 hostname=subdomain,
                 path=function.endpoint,
+                service_hostname=service_hostname,
                 service_name=service_name,
-                gateway_name=settings.gateway_name,
             )
 
             # 6. 최종 URL 생성
@@ -152,7 +149,6 @@ class K8sService:
             result = {
                 "namespace": namespace,
                 "service_name": service_name,
-                "domain_mapping": domain_mapping_name,
                 "http_route": http_route_name,
                 "function_url": function_url,
             }
@@ -192,15 +188,6 @@ class K8sService:
                 logger.info(f"Deleted HTTPRoute {route_name} for function {function.name}")
             except Exception as e:
                 logger.warning(f"Failed to delete HTTPRoute: {e}")
-                cleanup_success = False
-
-            # 2. DomainMapping 삭제
-            try:
-                subdomain = self._generate_subdomain(workspace.alias)
-                self.k8s_client.delete_domain_mapping(namespace_name, subdomain)
-                logger.info(f"Deleted DomainMapping for function {function.name}")
-            except Exception as e:
-                logger.warning(f"Failed to delete DomainMapping: {e}")
                 cleanup_success = False
 
             # 3. KNative Service 삭제
@@ -256,3 +243,10 @@ class K8sService:
         subdomain = self._generate_subdomain(workspace_alias)
         return f"https://{subdomain}{endpoint}"
 
+    def _generate_knative_service_url(
+        self,
+        service_name: str,
+        namespace: str,
+    ) -> str:
+        """KNative Service URL 생성"""
+        return f"{service_name}.{namespace}.haifu.cloud"
