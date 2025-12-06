@@ -174,9 +174,40 @@ def sanitize_function_id(function_id: str) -> str:
     return function_id
 
 
+def create_workspace_namespace_name(workspace_alias: str, prefix: str = "runna") -> str:
+    """
+    Workspace alias로부터 안전한 namespace 이름을 생성합니다.
+
+    Args:
+        workspace_alias: Workspace 별칭 (이미 sanitize됨)
+        prefix: Namespace prefix (기본값: "runna")
+
+    Returns:
+        Kubernetes에 사용할 준비가 된 안전한 namespace 이름
+
+    Raises:
+        SanitizationError: 입력이 유효하지 않은 경우
+    """
+    if not workspace_alias:
+        raise SanitizationError("Workspace alias는 비어있을 수 없습니다")
+    
+    if not prefix:
+        raise SanitizationError("Prefix는 비어있을 수 없습니다")
+
+    # Namespace 이름 생성
+    namespace = f"{prefix}-{workspace_alias}"
+
+    # 최종 검증
+    validate_namespace_name(namespace)
+
+    return namespace
+
+
 def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     """
     Workspace와 function ID로부터 안전한 namespace 이름을 생성합니다.
+    
+    (Deprecated: 이전 아키텍처용. 새로운 아키텍처에서는 create_workspace_namespace_name 사용)
 
     모든 sanitization 단계를 적용하고 최종 namespace 이름을 생성하는
     편의 함수입니다.
@@ -191,8 +222,8 @@ def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     Raises:
         SanitizationError: 입력이 유효하지 않은 경우
     """
-    # Workspace 이름 sanitize
-    safe_workspace = sanitize_workspace_name(workspace_name, strict=True)
+    # Workspace 이름 sanitize (대소문자 정규화 포함)
+    safe_workspace = sanitize_workspace_name(workspace_name.lower(), strict=True)
 
     # Function ID 검증
     safe_function_id = sanitize_function_id(function_id)

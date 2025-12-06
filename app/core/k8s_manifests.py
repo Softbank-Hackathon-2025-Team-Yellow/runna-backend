@@ -60,7 +60,8 @@ class ManifestBuilder:
                 "labels": {
                     "app": "runna",
                     "workspace": function.workspace.alias,
-                    "function": function.name,
+                    "function": str(function.id),
+                    "id": f"{function.workspace.alias}-{function.id}",
                 },
             },
             "spec": {
