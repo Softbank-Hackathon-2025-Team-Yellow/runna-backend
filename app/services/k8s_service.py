@@ -250,3 +250,81 @@ class K8sService:
     ) -> str:
         """KNative Service URL 생성"""
         return f"{service_name}.{namespace}.haifu.cloud"
+    
+    def create_workspace_namespace(self, workspace_alias: str) -> str:
+        """
+        Workspace를 위한 Namespace와 관련 K8s 리소스 생성
+        
+        Args:
+            workspace_alias: 워크스페이스 별칭
+            
+        Returns:
+            생성된 네임스페이스 이름
+            
+        Raises:
+            K8sServiceError: 리소스 생성 실패 시
+        """
+        try:
+            # 1. Namespace 생성
+            namespace_name = create_workspace_namespace_name(workspace_alias)
+            namespace = self.k8s_client.create_namespace(
+                name=namespace_name,
+                labels={
+                    "app": "runna",
+                    "workspace": workspace_alias,
+                    "type": "workspace"
+                }
+            )
+            
+            # 2. ClusterDomainClaim 생성
+            subdomain = self._generate_subdomain(workspace_alias)
+            self.k8s_client.create_cluster_domain_claim(
+                domain=subdomain,
+                namespace=namespace_name
+            )
+            
+            logger.info(f"Created workspace namespace {namespace} and domain claim {subdomain}")
+            return namespace
+            
+        except K8sClientError as e:
+            error_msg = f"Failed to create workspace K8s resources for {workspace_alias}: {str(e)}"
+            logger.error(error_msg)
+            raise K8sServiceError(error_msg)
+    
+    def delete_workspace_namespace(self, workspace_alias: str) -> bool:
+        """
+        Workspace의 Namespace와 관련 K8s 리소스 정리
+        
+        Args:
+            workspace_alias: 워크스페이스 별칭
+            
+        Returns:
+            삭제 성공 여부
+        """
+        try:
+            namespace_name = create_workspace_namespace_name(workspace_alias)
+            subdomain = self._generate_subdomain(workspace_alias)
+            
+            cleanup_success = True
+            
+            # ClusterDomainClaim 삭제 (클러스터 수준 리소스)
+            try:
+                self.k8s_client.delete_cluster_domain_claim(subdomain)
+                logger.info(f"Deleted ClusterDomainClaim {subdomain}")
+            except Exception as e:
+                logger.warning(f"Failed to delete ClusterDomainClaim {subdomain}: {e}")
+                cleanup_success = False
+            
+            # Namespace 삭제 (네임스페이스 내 모든 리소스가 함께 삭제됨)
+            try:
+                self.k8s_client.delete_namespace(namespace_name)
+                logger.info(f"Deleted namespace {namespace_name}")
+            except Exception as e:
+                logger.warning(f"Failed to delete namespace {namespace_name}: {e}")
+                cleanup_success = False
+            
+            return cleanup_success
+            
+        except Exception as e:
+            logger.error(f"Failed to cleanup workspace K8s resources for {workspace_alias}: {str(e)}")
+            return False

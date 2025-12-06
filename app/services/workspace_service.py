@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from app.core.sanitize import sanitize_workspace_alias, create_workspace_namespace_name
+from app.core.sanitize import sanitize_workspace_alias
 from app.core.security import create_workspace_token
 from app.models.function import Function
 from app.models.workspace import Workspace
@@ -284,22 +284,8 @@ class WorkspaceService:
         Raises:
             K8sServiceError: K8s 리소스 생성 실패 시
         """
-        # 1. Namespace 생성
-        namespace_name = create_workspace_namespace_name(workspace.alias)
-        self.k8s_service.k8s_client.create_namespace(
-            name=namespace_name,
-            labels={
-                "app": "runna",
-                "workspace": workspace.alias,
-                "type": "workspace"
-            }
-        )
-
-        # 2. ClusterDomainClaim 생성
-        subdomain = self.k8s_service._generate_subdomain(workspace.alias)
-        self.k8s_service.k8s_client.create_cluster_domain_claim(
-            domain=subdomain,
-            namespace=namespace_name
+        self.k8s_service.create_workspace_namespace(
+            workspace_alias=workspace.alias
         )
 
     def _cleanup_workspace_k8s_resources(self, workspace: Workspace) -> None:
@@ -309,14 +295,6 @@ class WorkspaceService:
         Args:
             workspace: 워크스페이스 객체
         """
-        namespace_name = create_workspace_namespace_name(workspace.alias)
-        subdomain = self.k8s_service._generate_subdomain(workspace.alias)
-
-        try:
-            # ClusterDomainClaim 삭제 (클러스터 수준 리소스)
-            self.k8s_service.k8s_client.delete_cluster_domain_claim(subdomain)
-        except Exception as e:
-            logger.warning(f"Failed to delete ClusterDomainClaim for workspace {workspace.alias}: {e}")
-
-        # Namespace 삭제 (네임스페이스 내 모든 리소스가 함께 삭제됨)
-        self.k8s_service.k8s_client.delete_namespace(namespace_name)
+        self.k8s_service.delete_workspace_namespace(
+            workspace_alias=workspace.alias
+        )
