@@ -253,7 +253,6 @@ class FunctionService:
     def deploy_function_to_k8s(
         self,
         function_id: UUID,
-        custom_path: str,
         env_vars: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
         """
@@ -261,7 +260,6 @@ class FunctionService:
 
         Args:
             function_id: 배포할 함수 ID
-            custom_path: 사용자 정의 경로
             env_vars: 추가 환경변수 (선택사항)
 
         Returns:
@@ -286,7 +284,6 @@ class FunctionService:
         return self.k8s_service.deploy_function(
             function=function,
             workspace=workspace,
-            custom_path=custom_path,
             env_vars=env_vars,
         )
 
@@ -343,16 +340,14 @@ class FunctionService:
         
         try:
             # 6. K8s 배포 실행
-            custom_path = function.endpoint
             deploy_result = self.deploy_function_to_k8s(
                 function_id=function_id,
-                custom_path=custom_path,
                 env_vars=env_vars,
             )
             
             # 7. 성공 처리
             function.deployment_status = DeploymentStatus.DEPLOYED
-            function.knative_url = deploy_result["ingress_url"]
+            function.knative_url = deploy_result["function_url"]
             function.last_deployed_at = datetime.utcnow()
             function.deployment_error = None
             self.db.commit()

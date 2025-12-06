@@ -16,7 +16,6 @@ from app.schemas.function import (
     FunctionResponse,
     FunctionUpdate,
     FunctionDeployRequest,
-    FunctionDeployResponse,
     FunctionDeploymentStatusResponse,
 )
 from app.schemas.job import JobResponse
@@ -175,7 +174,7 @@ def delete_function(
     return create_success_response(None)
 
 
-@router.post("/{function_id}/invoke")
+@router.post("/{function_id}/invoke", deprecated=True)
 async def invoke_function_with_user_auth(
     function_id: UUID,
     request: Dict[str, Any] = Body(...),
@@ -202,7 +201,7 @@ async def invoke_function_with_user_auth(
         return create_error_response("EXECUTION_ERROR", "Function execution failed")
 
 
-@router.post("/{function_id}/invoke/workspace")
+@router.post("/{function_id}/invoke/workspace", deprecated=True)
 async def invoke_function_with_workspace_auth(
     function_id: UUID,
     request: Dict[str, Any] = Body(...),
