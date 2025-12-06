@@ -7,10 +7,11 @@ def test_get_job_by_id(client: TestClient, mock_exec_client, test_workspace):
     # Create a function first
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return {'result': 'success'}",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-function"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -36,7 +37,7 @@ def test_get_job_by_id(client: TestClient, mock_exec_client, test_workspace):
     assert data["success"] is True
     assert data["data"]["job_id"] == job_id
     assert data["data"]["function_id"] == function_id
-    assert data["data"]["status"] == "success"  # ✅ succeeded → success
+    assert data["data"]["status"] == "SUCCESS"  # ✅ succeeded → success
 
     # Result is stored as JSON string, so parse it first
     result = (
@@ -62,10 +63,11 @@ def test_job_creation_with_failed_execution(
     # Create a function
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-function-failed"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -89,7 +91,7 @@ def test_job_creation_with_failed_execution(
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["status"] == "failed"
+    assert data["data"]["status"] == "FAILED"
     assert data["data"]["result"] is not None
 
 
@@ -97,10 +99,11 @@ def test_async_job_creation(client: TestClient, mock_exec_client, test_workspace
     # Create an async function
     function_data = {
         "name": "test_async_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "async",
+        "execution_type": "ASYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-async-function"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -121,7 +124,7 @@ def test_async_job_creation(client: TestClient, mock_exec_client, test_workspace
 
     data = response.json()
     assert data["success"] is True
-    assert data["data"]["status"] == "pending"
+    assert data["data"]["status"] == "PENDING"
     assert data["data"]["result"] is None
 
 
@@ -131,10 +134,11 @@ def test_multiple_jobs_for_function(
     # Create a function
     function_data = {
         "name": "test_function",
-        "runtime": "python",
+        "runtime": "PYTHON",
         "code": "def handler(event): return event",
-        "execution_type": "sync",
+        "execution_type": "SYNC",
         "workspace_id": str(test_workspace.id),
+        "endpoint": "/test-multiple-jobs"
     }
 
     create_response = client.post("/functions/", json=function_data)
@@ -167,5 +171,5 @@ def test_multiple_jobs_for_function(
     # Check that we have both jobs
     jobs = data["data"]["jobs"]
     statuses = [job["status"] for job in jobs]
-    assert "success" in statuses  # ✅ succeeded → success
-    assert "failed" in statuses
+    assert "SUCCESS" in statuses
+    assert "FAILED" in statuses
