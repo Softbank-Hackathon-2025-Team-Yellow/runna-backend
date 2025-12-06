@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from app.models.function import ExecutionType, Runtime
+from app.models.function import DeploymentStatus, ExecutionType, Runtime
 
 
 class FunctionBase(BaseModel):
@@ -33,6 +33,12 @@ class FunctionResponse(FunctionBase):
     workspace_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    
+    # Deployment tracking
+    deployment_status: DeploymentStatus
+    knative_url: Optional[str] = None
+    last_deployed_at: Optional[datetime] = None
+    deployment_error: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -55,3 +61,62 @@ class InvokeFunctionRequest(BaseModel):
     def to_dict(self) -> dict:
         """Convert request to dictionary for function execution"""
         return {k: v for k, v in self.model_dump().items() if v is not None}
+
+
+class FunctionDeployRequest(BaseModel):
+    """Function 배포 요청"""
+    env_vars: Optional[dict] = None  # 추가 환경변수 (선택사항)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "env_vars": {
+                    "API_KEY": "secret-key",
+                    "ENVIRONMENT": "production"
+                }
+            }
+        }
+
+
+class FunctionDeployResponse(BaseModel):
+    """Function 배포 결과"""
+    function_id: uuid.UUID
+    function_name: str
+    runtime: Runtime
+    namespace: str
+    service_name: str
+    ingress_url: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "function_id": "550e8400-e29b-41d4-a716-446655440000",
+                "function_name": "hello-world",
+                "runtime": "PYTHON",
+                "namespace": "my-api-550e8400-e29b-41d4-a716-446655440000",
+                "service_name": "hello-world",
+                "ingress_url": "https://my-api.runna.dev/hello-world"
+            }
+        }
+
+
+class FunctionDeploymentStatusResponse(BaseModel):
+    """Function 배포 상태 조회 결과"""
+    function_id: uuid.UUID
+    function_name: str
+    deployment_status: DeploymentStatus
+    knative_url: Optional[str] = None
+    last_deployed_at: Optional[datetime] = None
+    deployment_error: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "function_id": "550e8400-e29b-41d4-a716-446655440000",
+                "function_name": "hello-world",
+                "deployment_status": "DEPLOYED",
+                "knative_url": "https://my-api.runna.dev/hello-world",
+                "last_deployed_at": "2025-12-05T13:30:00Z",
+                "deployment_error": None
+            }
+        }

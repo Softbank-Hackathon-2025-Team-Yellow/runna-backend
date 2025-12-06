@@ -187,6 +187,16 @@ class K8sService:
         """KNative Service 매니페스트 생성"""
         revision_name = f"{function.name}-{uuid.uuid4().hex[:8]}"
 
+        # Runtime에 따른 Docker Image 선택
+        from app.models.function import Runtime
+        if function.runtime == Runtime.PYTHON:
+            docker_image = settings.k8s_python_image
+        elif function.runtime == Runtime.NODEJS:
+            docker_image = settings.k8s_nodejs_image
+        else:
+            # Fallback to default
+            docker_image = settings.k8s_docker_image
+
         # 환경변수 설정
         env_list = [{"name": "CODE_CONTENT", "value": function.code}]
         if env_vars:
@@ -221,7 +231,7 @@ class K8sService:
                         "containers": [
                             {
                                 "name": "user-container",
-                                "image": settings.k8s_docker_image,
+                                "image": docker_image,
                                 "resources": {
                                     "requests": {
                                         "cpu": settings.k8s_cpu_request,

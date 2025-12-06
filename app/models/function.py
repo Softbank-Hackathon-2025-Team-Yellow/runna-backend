@@ -28,6 +28,14 @@ class ExecutionType(str, enum.Enum):
     ASYNC = "ASYNC"
 
 
+class DeploymentStatus(str, enum.Enum):
+    """배포 상태"""
+    NOT_DEPLOYED = "NOT_DEPLOYED"  # 배포된 적 없음
+    DEPLOYING = "DEPLOYING"  # 배포 중
+    DEPLOYED = "DEPLOYED"  # 배포 완료
+    FAILED = "FAILED"  # 배포 실패
+
+
 class Function(Base):
     """
     Function 모델
@@ -51,16 +59,25 @@ class Function(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(255), unique=False, index=True, nullable=False)
     endpoint = Column(String(100), nullable=False, index=True)  # unique=True 제거
-    runtime = Column(Enum(Runtime), nullable=False)
+    runtime = Column(Enum(Runtime, name="runtime"), nullable=False)
     code = Column(Text, nullable=False)
-    execution_type = Column(Enum(ExecutionType), nullable=False)
-    workspace_id = Column(
-        UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False
-    )
+    execution_type = Column(Enum(ExecutionType, name="executiontype"), nullable=False)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    
+    # Deployment tracking
+    deployment_status = Column(
+        Enum(DeploymentStatus, name="deploymentstatus"), 
+        nullable=False, 
+        default=DeploymentStatus.NOT_DEPLOYED,
+        server_default=DeploymentStatus.NOT_DEPLOYED.value
+    )
+    knative_url = Column(String(500), nullable=True)  # 배포된 KNative URL
+    last_deployed_at = Column(DateTime(timezone=True), nullable=True)  # 마지막 배포 시간
+    deployment_error = Column(Text, nullable=True)  # 배포 실패 시 에러 메시지
 
     # Relationships
     jobs = relationship("Job", back_populates="function")

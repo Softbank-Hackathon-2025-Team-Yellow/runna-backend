@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Depends, Body, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.response import create_error_response, create_success_response
@@ -15,11 +15,15 @@ from app.schemas.function import (
     FunctionCreate,
     FunctionResponse,
     FunctionUpdate,
+    FunctionDeployRequest,
+    FunctionDeployResponse,
+    FunctionDeploymentStatusResponse,
 )
 from app.schemas.job import JobResponse
 from app.services.execution_service import ExecutionService
 from app.services.function_service import FunctionService
 from app.services.job_service import JobService
+from app.services.workspace_service import WorkspaceService
 from app.services.workspace_service import WorkspaceService
 
 router = APIRouter()
@@ -281,3 +285,102 @@ def get_function_metrics(
         return create_success_response(metrics)
     except Exception:
         return create_error_response("INTERNAL_ERROR", "Internal server error")
+
+
+@router.post("/{function_id}/deploy")
+async def deploy_function(
+    function_id: UUID,
+    deploy_request: FunctionDeployRequest = Body(default=FunctionDeployRequest()),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Function을 K8s 클러스터에 동기적으로 배포
+    
+    배포가 완료될 때까지 대기 후 결과 반환.
+    
+    Args:
+        function_id: 배포할 Function ID
+        deploy_request: 배포 요청 (환경변수 등)
+
+    Returns:
+        배포 성공 시: {"status": "SUCCESS", "knative_url": "...", "message": "..."}
+        배포 실패 시: {"success": false, "error": {...}}
+
+    Raises:
+        VALIDATION_ERROR: 코드가 비어있거나 정적 분석 실패
+        ACCESS_DENIED: 권한 없음
+        DEPLOYMENT_FAILED: K8s 배포 실패
+    """
+    import asyncio
+    from app.services.k8s_service import K8sServiceError
+    
+    # 1. 권한 검증
+    has_access, function, error_msg = _validate_function_access(
+        db, function_id, current_user.id
+    )
+    if not has_access:
+        return create_error_response("ACCESS_DENIED", error_msg)
+    
+    # 2. FunctionService.deploy() 호출
+    function_service = FunctionService(db)
+    try:
+        result = await asyncio.to_thread(
+            function_service.deploy,
+            function_id=function_id,
+            env_vars=deploy_request.env_vars
+        )
+        return create_success_response(result)
+    except ValueError as e:
+        return create_error_response("VALIDATION_ERROR", str(e))
+    except K8sServiceError as e:
+        return create_error_response("DEPLOYMENT_FAILED", str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("DEPLOYMENT_FAILED", f"Deployment failed: {str(e)}")
+
+
+@router.get("/{function_id}/deployment")
+def get_deployment_status(
+    function_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Function 배포 상태 조회
+    
+    Args:
+        function_id: 조회할 Function ID
+        
+    Returns:
+        배포 상태 정보 (deployment_status, knative_url, last_deployed_at, deployment_error)
+        
+    Raises:
+        ACCESS_DENIED: 권한 없음
+        FUNCTION_NOT_FOUND: Function 없음
+    """
+    try:
+        # 접근 권한 검증
+        has_access, function, error_msg = _validate_function_access(
+            db, function_id, current_user.id
+        )
+        if not has_access:
+            return create_error_response("ACCESS_DENIED", error_msg)
+        
+        # 응답 생성
+        response = FunctionDeploymentStatusResponse(
+            function_id=function.id,
+            function_name=function.name,
+            deployment_status=function.deployment_status,
+            knative_url=function.knative_url,
+            last_deployed_at=function.last_deployed_at,
+            deployment_error=function.deployment_error
+        )
+        
+        return create_success_response(response.model_dump())
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return create_error_response("INTERNAL_ERROR", f"Failed to get deployment status: {str(e)}")
