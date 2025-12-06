@@ -128,17 +128,17 @@ class K8sService:
 
             subdomain = self._generate_subdomain(workspace.alias)
             
-            # 3. ClusterDomainClaim 생성
-            # claim_name = self.k8s_client.create_cluster_domain_claim(
-            #     domain=subdomain, namespace=namespace
-            # )
+            # # 3. ClusterDomainClaim 생성
+            claim_name = self.k8s_client.create_cluster_domain_claim(
+                domain=subdomain, namespace=namespace
+            )
 
-            # # 4. DomainMapping 생성
-            # domain_mapping_name = self.k8s_client.create_domain_mapping(
-            #     namespace=namespace,
-            #     domain=subdomain,
-            #     service_name=service_name,
-            # )
+            # 4. DomainMapping 생성
+            domain_mapping_name = self.k8s_client.create_domain_mapping(
+                namespace=namespace,
+                domain=subdomain,
+                service_name=service_name,
+            )
 
             # 5. HTTPRoute 생성 (Gateway API)
             http_route_name = self.k8s_client.create_http_route(

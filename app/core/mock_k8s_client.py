@@ -42,18 +42,18 @@ class MockK8sClient:
 
     def create_knative_service(self, namespace: str, manifest: Dict) -> str:
         """
-        Mock KNative Service 생성
+        Mock KNative Service 생성 또는 업데이트
 
         Args:
             namespace: 배포할 네임스페이스
             manifest: KNative Service 매니페스트
 
         Returns:
-            생성된 KNative Service 이름
+            생성/업데이트된 KNative Service 이름
         """
         service_name = manifest.get("metadata", {}).get("name", "mock-service")
         logger.info(
-            f"[MOCK] ✅ KNative Service {service_name} created successfully "
+            f"[MOCK] ✅ KNative Service {service_name} created/updated successfully "
             f"(namespace: {namespace})"
         )
         return service_name
@@ -153,3 +153,110 @@ class MockK8sClient:
                 }
             ],
         }
+
+    def create_cluster_domain_claim(self, domain: str, namespace: str) -> str:
+        """
+        Mock ClusterDomainClaim 생성
+
+        Args:
+            domain: 클레임할 도메인
+            namespace: 도메인을 사용할 네임스페이스
+
+        Returns:
+            생성된 ClusterDomainClaim 이름
+        """
+        logger.info(f"[MOCK] ✅ ClusterDomainClaim {domain} created successfully")
+        return domain
+
+    def delete_cluster_domain_claim(self, claim_name: str) -> bool:
+        """
+        Mock ClusterDomainClaim 삭제
+
+        Args:
+            claim_name: 삭제할 클레임 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        logger.info(f"[MOCK] ✅ ClusterDomainClaim {claim_name} deleted successfully")
+        return True
+
+    def create_domain_mapping(
+        self, namespace: str, domain: str, service_name: str
+    ) -> str:
+        """
+        Mock DomainMapping 생성
+
+        Args:
+            namespace: DomainMapping이 생성될 네임스페이스
+            domain: 매핑할 도메인
+            service_name: 연결할 KNative Service 이름
+
+        Returns:
+            생성된 DomainMapping 이름
+        """
+        logger.info(f"[MOCK] ✅ DomainMapping {domain} created successfully")
+        return domain
+
+    def delete_domain_mapping(self, namespace: str, mapping_name: str) -> bool:
+        """
+        Mock DomainMapping 삭제
+
+        Args:
+            namespace: DomainMapping이 위치한 네임스페이스
+            mapping_name: 삭제할 DomainMapping 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        logger.info(f"[MOCK] ✅ DomainMapping {mapping_name} deleted successfully")
+        return True
+
+    def create_http_route(
+        self,
+        namespace: str,
+        hostname: str,
+        path: str,
+        service_name: str,
+        gateway_name: str = "3scale-kourier-gateway",
+    ) -> str:
+        """
+        Mock Gateway API HTTPRoute 생성 또는 업데이트
+
+        Args:
+            namespace: HTTPRoute가 생성될 네임스페이스
+            hostname: 라우팅할 호스트명
+            path: 라우팅할 경로
+            service_name: 백엔드 KNative Service 이름
+            gateway_name: Gateway 이름
+
+        Returns:
+            생성/업데이트된 HTTPRoute 이름
+        """
+        route_name = f"route-{service_name}"
+        logger.info(f"[MOCK] ✅ HTTPRoute {route_name} created/updated successfully")
+        return route_name
+
+    def delete_http_route(self, namespace: str, route_name: str) -> bool:
+        """
+        Mock HTTPRoute 삭제
+
+        Args:
+            namespace: HTTPRoute가 위치한 네임스페이스
+            route_name: 삭제할 HTTPRoute 이름
+
+        Returns:
+            삭제 성공 여부
+        """
+        logger.info(f"[MOCK] ✅ HTTPRoute {route_name} deleted successfully")
+        return True
+
+    @property
+    def v1_core(self):
+        """Mock CoreV1Api 속성"""
+        return self
+
+    def read_namespace(self, name: str):
+        """Mock namespace 읽기"""
+        logger.info(f"[MOCK] Reading namespace {name}")
+        return type('MockNamespace', (), {'metadata': {'name': name}})()

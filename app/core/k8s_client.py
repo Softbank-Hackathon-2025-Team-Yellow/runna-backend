@@ -85,36 +85,69 @@ class K8sClient:
 
     def create_knative_service(self, namespace: str, manifest: Dict) -> str:
         """
-        KNative Service 생성
+        KNative Service 생성 또는 업데이트
 
         Args:
             namespace: 배포할 네임스페이스
             manifest: KNative Service 매니페스트
 
         Returns:
-            생성된 KNative Service 이름
+            생성/업데이트된 KNative Service 이름
 
         Raises:
-            K8sClientError: 생성 실패 시
+            K8sClientError: 생성/업데이트 실패 시
         """
+        service_name = manifest["metadata"]["name"]
+        
         try:
-            response = self.custom_objects.create_namespaced_custom_object(
-                group="serving.knative.dev",
-                version="v1",
-                namespace=namespace,
-                plural="services",
-                body=manifest,
-            )
+            # 기존 서비스 존재 여부 확인
+            try:
+                existing_service = self.custom_objects.get_namespaced_custom_object(
+                    group="serving.knative.dev",
+                    version="v1",
+                    namespace=namespace,
+                    plural="services",
+                    name=service_name,
+                )
+                
+                # 기존 서비스가 존재하면 업데이트
+                logger.info(f"KNative Service {service_name} already exists, updating...")
+                response = self.custom_objects.patch_namespaced_custom_object(
+                    group="serving.knative.dev",
+                    version="v1",
+                    namespace=namespace,
+                    plural="services",
+                    name=service_name,
+                    body=manifest,
+                )
+                
+                logger.info(
+                    f"✅ KNative Service {service_name} updated successfully "
+                    f"(namespace: {namespace})"
+                )
+                return service_name
+                
+            except ApiException as e:
+                if e.status != 404:
+                    raise
+                
+                # 서비스가 존재하지 않으면 새로 생성
+                response = self.custom_objects.create_namespaced_custom_object(
+                    group="serving.knative.dev",
+                    version="v1",
+                    namespace=namespace,
+                    plural="services",
+                    body=manifest,
+                )
 
-            service_name = response["metadata"]["name"]
-            logger.info(
-                f"✅ KNative Service {service_name} created successfully "
-                f"(namespace: {namespace})"
-            )
-            return service_name
+                logger.info(
+                    f"✅ KNative Service {service_name} created successfully "
+                    f"(namespace: {namespace})"
+                )
+                return service_name
 
         except ApiException as e:
-            error_msg = f"Failed to create KNative Service: {e.reason}"
+            error_msg = f"Failed to create/update KNative Service {service_name}: {e.reason}"
             logger.error(error_msg)
             raise K8sClientError(error_msg)
 
@@ -425,7 +458,7 @@ class K8sClient:
         gateway_name: str = "3scale-kourier-gateway",
     ) -> str:
         """
-        Gateway API HTTPRoute 생성
+        Gateway API HTTPRoute 생성 또는 업데이트
 
         Args:
             namespace: HTTPRoute가 생성될 네임스페이스
@@ -435,10 +468,10 @@ class K8sClient:
             gateway_name: Gateway 이름
 
         Returns:
-            생성된 HTTPRoute 이름
+            생성/업데이트된 HTTPRoute 이름
 
         Raises:
-            K8sClientError: 생성 실패 시
+            K8sClientError: 생성/업데이트 실패 시
         """
         manifest = ManifestBuilder.build_http_route_manifest(
             namespace, hostname, path, service_name, gateway_name
@@ -446,22 +479,48 @@ class K8sClient:
         route_name = ManifestBuilder.generate_route_name(service_name)
 
         try:
-            self.custom_objects.create_namespaced_custom_object(
-                group="gateway.networking.k8s.io",
-                version="v1beta1",
-                namespace=namespace,
-                plural="httproutes",
-                body=manifest,
-            )
+            # 기존 HTTPRoute 존재 여부 확인
+            try:
+                existing_route = self.custom_objects.get_namespaced_custom_object(
+                    group="gateway.networking.k8s.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="httproutes",
+                    name=route_name,
+                )
+                
+                # 기존 HTTPRoute가 존재하면 업데이트
+                logger.info(f"HTTPRoute {route_name} already exists, updating...")
+                self.custom_objects.patch_namespaced_custom_object(
+                    group="gateway.networking.k8s.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="httproutes",
+                    name=route_name,
+                    body=manifest,
+                )
+                
+                logger.info(f"✅ HTTPRoute {route_name} updated successfully")
+                return route_name
+                
+            except ApiException as e:
+                if e.status != 404:
+                    raise
+                
+                # HTTPRoute가 존재하지 않으면 새로 생성
+                self.custom_objects.create_namespaced_custom_object(
+                    group="gateway.networking.k8s.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="httproutes",
+                    body=manifest,
+                )
 
-            logger.info(f"✅ HTTPRoute {route_name} created successfully")
-            return route_name
+                logger.info(f"✅ HTTPRoute {route_name} created successfully")
+                return route_name
 
         except ApiException as e:
-            if e.status == 409:
-                logger.info(f"HTTPRoute {route_name} already exists")
-                return route_name
-            error_msg = f"Failed to create HTTPRoute: {e.reason}"
+            error_msg = f"Failed to create/update HTTPRoute {route_name}: {e.reason}"
             logger.error(error_msg)
             raise K8sClientError(error_msg)
 

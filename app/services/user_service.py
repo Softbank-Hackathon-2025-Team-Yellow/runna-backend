@@ -39,7 +39,7 @@ class UserService:
         return user
 
     def create_access_token_for_user(self, user: User) -> str:
-        access_token_expires = timedelta(minutes=30)
+        access_token_expires = timedelta(minutes=120)
         access_token = create_access_token(
             data={"sub": user.username}, expires_delta=access_token_expires
         )
