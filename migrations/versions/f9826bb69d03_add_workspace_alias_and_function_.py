@@ -36,15 +36,13 @@ def upgrade() -> None:
     op.add_column(
         "functions", sa.Column("endpoint", sa.String(length=100), nullable=False)
     )
-    op.create_unique_constraint("uq_functions_endpoint", "functions", ["endpoint"])
-    op.create_index("ix_functions_endpoint", "functions", ["endpoint"], unique=True)
+    op.create_index("ix_functions_endpoint", "functions", ["endpoint"], unique=False)
 
 
 def downgrade() -> None:
     """Rollback schema changes."""
     # Function endpoint 컬럼 제거
     op.drop_index("ix_functions_endpoint", table_name="functions")
-    op.drop_constraint("uq_functions_endpoint", "functions", type_="unique")
     op.drop_column("functions", "endpoint")
 
     # Workspace alias 컬럼 제거
