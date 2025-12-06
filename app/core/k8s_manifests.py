@@ -110,7 +110,7 @@ class ManifestBuilder:
         return {
             "apiVersion": "networking.internal.knative.dev/v1alpha1",
             "kind": "ClusterDomainClaim",
-            "metadata": {"name": domain},
+            "metadata": {"name": domain, "namespace": namespace},
             "spec": {"namespace": namespace},
         }
 
@@ -130,7 +130,7 @@ class ManifestBuilder:
             DomainMapping 매니페스트
         """
         return {
-            "apiVersion": "serving.knative.dev/v1alpha1",
+            "apiVersion": "serving.knative.dev/v1beta1",
             "kind": "DomainMapping",
             "metadata": {"name": domain, "namespace": namespace},
             "spec": {
@@ -166,7 +166,7 @@ class ManifestBuilder:
         route_name = f"{service_name}-route"
 
         return {
-            "apiVersion": "gateway.networking.k8s.io/v1",
+            "apiVersion": "gateway.networking.k8s.io/v1beta1",
             "kind": "HTTPRoute",
             "metadata": {"name": route_name, "namespace": namespace},
             "spec": {
@@ -179,9 +179,6 @@ class ManifestBuilder:
                             {
                                 "name": service_name,
                                 "port": 80,
-                                "kind": "Service",
-                                "group": "serving.knative.dev",
-                                "weight": 100,
                             }
                         ],
                     }

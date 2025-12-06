@@ -126,18 +126,19 @@ class K8sService:
                 namespace=namespace, manifest=knative_manifest
             )
 
-            # 3. ClusterDomainClaim 생성
             subdomain = self._generate_subdomain(workspace.alias)
-            claim_name = self.k8s_client.create_cluster_domain_claim(
-                domain=subdomain, namespace=namespace
-            )
+            
+            # 3. ClusterDomainClaim 생성
+            # claim_name = self.k8s_client.create_cluster_domain_claim(
+            #     domain=subdomain, namespace=namespace
+            # )
 
-            # 4. DomainMapping 생성
-            domain_mapping_name = self.k8s_client.create_domain_mapping(
-                namespace=namespace,
-                domain=subdomain,
-                service_name=service_name,
-            )
+            # # 4. DomainMapping 생성
+            # domain_mapping_name = self.k8s_client.create_domain_mapping(
+            #     namespace=namespace,
+            #     domain=subdomain,
+            #     service_name=service_name,
+            # )
 
             # 5. HTTPRoute 생성 (Gateway API)
             http_route_name = self.k8s_client.create_http_route(
@@ -156,8 +157,8 @@ class K8sService:
             result = {
                 "namespace": namespace,
                 "service_name": service_name,
-                "cluster_domain_claim": claim_name,
-                "domain_mapping": domain_mapping_name,
+                # "cluster_domain_claim": claim_name,
+                # "domain_mapping": domain_mapping_name,
                 "http_route": http_route_name,
                 "function_url": function_url,
             }

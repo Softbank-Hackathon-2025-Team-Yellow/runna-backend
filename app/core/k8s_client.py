@@ -368,7 +368,7 @@ class K8sClient:
         try:
             self.custom_objects.create_namespaced_custom_object(
                 group="serving.knative.dev",
-                version="v1alpha1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="domainmappings",
                 body=manifest,
@@ -399,7 +399,7 @@ class K8sClient:
         try:
             self.custom_objects.delete_namespaced_custom_object(
                 group="serving.knative.dev",
-                version="v1alpha1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="domainmappings",
                 name=mapping_name,
@@ -448,7 +448,7 @@ class K8sClient:
         try:
             self.custom_objects.create_namespaced_custom_object(
                 group="gateway.networking.k8s.io",
-                version="v1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="httproutes",
                 body=manifest,
