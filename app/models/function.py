@@ -83,9 +83,10 @@ class Function(Base):
     jobs = relationship("Job", back_populates="function")
     workspace = relationship("Workspace", back_populates="functions")
 
-    # Composite unique constraint: workspace 내에서만 endpoint가 unique
+    # Composite unique constraints: workspace 내에서 endpoint와 name이 각각 unique
     __table_args__ = (
         UniqueConstraint("workspace_id", "endpoint", name="uq_workspace_endpoint"),
+        UniqueConstraint("workspace_id", "name", name="uq_workspace_name"),
     )
 
     @validates("endpoint")
