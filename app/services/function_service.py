@@ -189,16 +189,20 @@ class FunctionService:
 
         # endpoint 검증 및 변경
         if "endpoint" in update_data:
-            new_endpoint = validate_custom_endpoint(update_data["endpoint"])
-            # Workspace 내 중복 확인 (자신 제외)
-            existing = self.get_function_by_workspace_and_endpoint(
-                db_function.workspace_id, new_endpoint
-            )
-            if existing and existing.id != db_function.id:
-                raise ValueError(
-                    f"Endpoint '{new_endpoint}' already exists in this workspace"
+            # endpoint가 빈 값(None 또는 빈 문자열)이면 현재 endpoint 유지
+            if not update_data["endpoint"] or not update_data["endpoint"].strip():
+                del update_data["endpoint"]
+            else:
+                new_endpoint = validate_custom_endpoint(update_data["endpoint"])
+                # Workspace 내 중복 확인 (자신 제외)
+                existing = self.get_function_by_workspace_and_endpoint(
+                    db_function.workspace_id, new_endpoint
                 )
-            update_data["endpoint"] = new_endpoint
+                if existing and existing.id != db_function.id:
+                    raise ValueError(
+                        f"Endpoint '{new_endpoint}' already exists in this workspace"
+                    )
+                update_data["endpoint"] = new_endpoint
 
         for field, value in update_data.items():
             setattr(db_function, field, value)
