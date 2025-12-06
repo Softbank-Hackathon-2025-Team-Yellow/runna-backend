@@ -290,6 +290,87 @@ class FunctionService:
             env_vars=env_vars,
         )
 
+    def deploy(
+        self,
+        function_id: UUID,
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, str]:
+        """
+        Function 배포 전체 워크플로우 실행
+        
+        1. Function 조회
+        2. 유효성 검증 (코드, Runtime, 정적 분석)
+        3. 상태 업데이트 (DEPLOYING)
+        4. K8s 배포 실행
+        5. 결과에 따른 상태 업데이트 (DEPLOYED/FAILED)
+        
+        Args:
+            function_id: 배포할 함수 ID
+            env_vars: 추가 환경변수 (선택사항)
+            
+        Returns:
+            배포 결과 정보 {"status": "SUCCESS", "knative_url": "...", ...}
+            
+        Raises:
+            ValueError: Function 없음, 코드 비어있음, Runtime 미지원, 정적 분석 실패
+            K8sServiceError: K8s 배포 실패
+        """
+        from datetime import datetime
+        from app.models.function import DeploymentStatus, Runtime
+        
+        # 1. Function 조회
+        function = self.get_function(function_id)
+        if not function:
+            raise ValueError(f"Function with id {function_id} not found")
+        
+        # 2. 코드 존재 확인
+        if not function.code or not function.code.strip():
+            raise ValueError("Function code is empty. Cannot deploy without code.")
+        
+        # 3. Runtime 유효성 확인
+        if function.runtime not in [Runtime.PYTHON, Runtime.NODEJS]:
+            raise ValueError(f"Unsupported runtime: {function.runtime}. Only PYTHON and NODEJS are supported.")
+        
+        # 4. 정적 분석 (보안 검증)
+        analysis_result = self._analyze_code(function.code, function.runtime.value)
+        if not analysis_result["is_safe"]:
+            raise ValueError(f"Code validation failed: {', '.join(analysis_result['violations'])}")
+        
+        # 5. 상태 업데이트: DEPLOYING
+        function.deployment_status = DeploymentStatus.DEPLOYING
+        function.deployment_error = None
+        self.db.commit()
+        
+        try:
+            # 6. K8s 배포 실행
+            custom_path = function.endpoint
+            deploy_result = self.deploy_function_to_k8s(
+                function_id=function_id,
+                custom_path=custom_path,
+                env_vars=env_vars,
+            )
+            
+            # 7. 성공 처리
+            function.deployment_status = DeploymentStatus.DEPLOYED
+            function.knative_url = deploy_result["ingress_url"]
+            function.last_deployed_at = datetime.utcnow()
+            function.deployment_error = None
+            self.db.commit()
+            
+            return {
+                "status": "SUCCESS",
+                "knative_url": function.knative_url,
+                "message": "Deployment successful"
+            }
+            
+        except Exception as e:
+            # 8. 실패 처리
+            self.db.rollback()
+            function.deployment_status = DeploymentStatus.FAILED
+            function.deployment_error = str(e)
+            self.db.commit()
+            raise
+
     def get_function_deployment_status(self, function_id: UUID) -> Optional[Dict]:
         """
         함수 배포 상태 확인

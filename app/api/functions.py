@@ -310,128 +310,35 @@ async def deploy_function(
     Raises:
         VALIDATION_ERROR: 코드가 비어있거나 정적 분석 실패
         ACCESS_DENIED: 권한 없음
-        WORKSPACE_NOT_FOUND: Workspace 없음
         DEPLOYMENT_FAILED: K8s 배포 실패
     """
+    import asyncio
+    from app.services.k8s_service import K8sServiceError
+    
+    # 1. 권한 검증
+    has_access, function, error_msg = _validate_function_access(
+        db, function_id, current_user.id
+    )
+    if not has_access:
+        return create_error_response("ACCESS_DENIED", error_msg)
+    
+    # 2. FunctionService.deploy() 호출
+    function_service = FunctionService(db)
     try:
-        # 1. Function 조회 및 권한 검증
-        has_access, function, error_msg = _validate_function_access(
-            db, function_id, current_user.id
+        result = await asyncio.to_thread(
+            function_service.deploy,
+            function_id=function_id,
+            env_vars=deploy_request.env_vars
         )
-        if not has_access:
-            return create_error_response("ACCESS_DENIED", error_msg)
-
-        # 2. Workspace 조회
-        workspace_service = WorkspaceService(db)
-        workspace = workspace_service.get_workspace_by_id(function.workspace_id)
-
-        if not workspace:
-            return create_error_response(
-                "WORKSPACE_NOT_FOUND",
-                f"Workspace with id {function.workspace_id} not found"
-            )
-
-        # 3. 코드 존재 확인
-        if not function.code or not function.code.strip():
-            return create_error_response(
-                "VALIDATION_ERROR",
-                "Function code is empty. Cannot deploy without code."
-            )
-
-        # 4. Runtime 유효성 확인
-        from app.models.function import Runtime
-        if function.runtime not in [Runtime.PYTHON, Runtime.NODEJS]:
-            return create_error_response(
-                "VALIDATION_ERROR",
-                f"Unsupported runtime: {function.runtime}. Only PYTHON and NODEJS are supported."
-            )
-
-        # 5. 코드 정적 분석 재수행 (보안 검증)
-        from app.core.static_analysis import analyzer
-
-        if function.runtime == Runtime.PYTHON:
-            analysis_result = analyzer.analyze_python_code(function.code)
-        elif function.runtime == Runtime.NODEJS:
-            analysis_result = analyzer.analyze_nodejs_code(function.code)
-        else:
-            analysis_result = {"is_safe": False, "violations": ["Unsupported runtime"]}
-
-        if not analysis_result["is_safe"]:
-            return create_error_response(
-                "VALIDATION_ERROR",
-                f"Code validation failed: {', '.join(analysis_result['violations'])}"
-            )
-
-        # 6. Custom path 설정 (endpoint 사용)
-        custom_path = function.endpoint  # "/hello" → ingress path
-
-    # ... (imports and previous checks remain same) ...
-
-        # 7. Function 상태: DEPLOYING으로 변경
-        from app.models.function import DeploymentStatus
-        
-        function.deployment_status = DeploymentStatus.DEPLOYING
-        function.deployment_error = None
-        
-        db.commit()
-        
-        try:
-            # 8. 동기 배포 실행 (FunctionService 직접 호출)
-            # K8s API 호출 등 블로킹 가능성이 있으므로 to_thread 고려 가능하나,
-            # FunctionService 자체가 동기라면 여기서 await 없이 호출하거나 
-            # asyncio.to_thread로 감싸서 실행.
-            
-            # FunctionService는 현재 동기로 작성되어 있다고 가정.
-            # 만약 FunctionService.deploy_function_to_k8s가 blocking이면 
-            # 전체 서버가 멈출 수 있으므로 thread pool에서 실행하는 것이 안전함.
-            import asyncio
-            from app.services.function_service import FunctionService
-            
-            function_service = FunctionService(db)
-            
-            deploy_result = await asyncio.to_thread(
-                function_service.deploy_function_to_k8s,
-                function_id=function_id,
-                custom_path=custom_path,
-                env_vars=deploy_request.env_vars
-            )
-            
-            # 9. 성공 처리
-            function.deployment_status = DeploymentStatus.DEPLOYED
-            function.knative_url = deploy_result["ingress_url"]
-            from datetime import datetime
-            function.last_deployed_at = datetime.utcnow()
-            function.deployment_error = None
-            
-            db.commit()
-            
-            return create_success_response({
-                "status": "SUCCESS",
-                "knative_url": function.knative_url,
-                "message": "Deployment successful"
-            })
-            
-        except Exception as e:
-            # 실패 처리
-            db.rollback() # 혹시 모를 트랜잭션 정리
-            
-            # 새 세션이나 현재 세션에서 상태 업데이트
-            function.deployment_status = DeploymentStatus.FAILED
-            function.deployment_error = str(e)
-            
-            db.commit()
-            
-            import traceback
-            traceback.print_exc()
-            
-            return create_error_response("DEPLOYMENT_FAILED", f"Deployment failed: {str(e)}")
-
+        return create_success_response(result)
     except ValueError as e:
         return create_error_response("VALIDATION_ERROR", str(e))
+    except K8sServiceError as e:
+        return create_error_response("DEPLOYMENT_FAILED", str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return create_error_response("DEPLOYMENT_FAILED", f"Failed to start deployment: {str(e)}")
+        return create_error_response("DEPLOYMENT_FAILED", f"Deployment failed: {str(e)}")
 
 
 @router.get("/{function_id}/deployment")
