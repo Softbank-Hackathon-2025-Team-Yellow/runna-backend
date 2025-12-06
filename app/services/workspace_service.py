@@ -45,6 +45,18 @@ class WorkspaceService:
         """
         return self.db.query(Workspace).filter(Workspace.name == name).first()
 
+    def get_workspace_by_alias(self, alias: str) -> Optional[Workspace]:
+        """
+        별칭으로 워크스페이스 조회
+
+        Args:
+            alias: 워크스페이스 별칭
+
+        Returns:
+            워크스페이스 객체 또는 None
+        """
+        return self.db.query(Workspace).filter(Workspace.alias == alias).first()
+
     def list_user_workspaces(self, user_id: int) -> List[Workspace]:
         """
         사용자가 소유한 워크스페이스 목록 조회
@@ -56,18 +68,6 @@ class WorkspaceService:
             워크스페이스 목록
         """
         return self.db.query(Workspace).filter(Workspace.user_id == user_id).all()
-
-    def get_workspace_by_alias(self, alias: str) -> Optional[Workspace]:
-        """
-        alias로 워크스페이스 조회
-
-        Args:
-            alias: 워크스페이스 alias
-
-        Returns:
-            워크스페이스 객체 또는 None
-        """
-        return self.db.query(Workspace).filter(Workspace.alias == alias).first()
 
     def create_workspace(
         self, workspace_data: WorkspaceCreate, user_id: int
@@ -86,7 +86,7 @@ class WorkspaceService:
             ValueError: 워크스페이스 이름이 이미 존재하거나 유효하지 않은 경우
             SanitizationError: alias 생성 실패
         """
-        # 이름 중복 검사
+        # 별칭 중복 검사
         existing_workspace = self.get_workspace_by_name(workspace_data.name)
         if existing_workspace:
             raise ValueError(

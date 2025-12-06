@@ -32,7 +32,7 @@ def test_workspace_name_validation():
         try:
             # SQLAlchemy @validates 호출하기 위해 임시 인스턴스 생성 시도
             ws = Workspace()
-            validated_name = ws.validate_name("name", name)
+            ws.validate_name("name", name)
 
             if should_pass:
                 print(f"  PASS: '{name}' - {description}")

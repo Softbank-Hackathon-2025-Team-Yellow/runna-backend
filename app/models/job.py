@@ -32,7 +32,6 @@ class Job(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     function_id = Column(UUID(as_uuid=True), ForeignKey("functions.id"), nullable=False)
-    job_type = Column(Enum(JobType, name="jobtype"), default=JobType.EXECUTION, nullable=False)
     status = Column(Enum(JobStatus, name="jobstatus"), default=JobStatus.PENDING)
     result = Column(Text, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
