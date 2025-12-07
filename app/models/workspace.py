@@ -32,6 +32,7 @@ class Workspace(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(255), unique=True, nullable=False, index=True)
     alias = Column(String(20), unique=True, nullable=False, index=True)
+    api_key = Column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
