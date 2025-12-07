@@ -107,22 +107,9 @@ class FunctionService:
             self.db.commit()
             raise ValueError("Workspace not found")
 
-        # 5. Namespace 생성 (function 생성 시점에만 수행)
-        try:
-            namespace = self.k8s_service.create_namespace(
-                workspace.alias,
-                str(db_function.id),  # UUID를 문자열로 변환
-            )
-            logger.info(f"Created namespace {namespace} for function {db_function.id}")
-        except Exception as e:
-            # Namespace 생성 실패 시 Function 삭제 (rollback)
-            logger.error(
-                f"Failed to create namespace for function {db_function.id}: {e}"
-            )
-            self.db.delete(db_function)
-            self.db.commit()
-            raise ValueError(f"Failed to create namespace: {e}")
-
+        # Namespace는 이제 workspace 생성 시에 미리 생성됨
+        # Function은 workspace의 기존 namespace를 사용
+        
         return db_function
 
     def get_function(self, function_id: UUID) -> Optional[Function]:
@@ -188,27 +175,14 @@ class FunctionService:
             .first()
         )
 
-        # Namespace 삭제
-        if workspace:
-            try:
-                self.namespace_manager.delete_function_namespace(
-                    workspace.name,
-                    str(function_id),  # UUID를 문자열로 변환
-                )
-                logger.info(f"Deleted namespace for function {function_id}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to delete namespace for function {function_id}: {e}"
-                )
-                # namespace 삭제 실패해도 DB는 삭제 진행
-
+        # K8s 리소스 정리 (namespace는 유지, function 관련 리소스만 삭제)
         try:
-            # K8s 리소스 정리 (실패해도 DB 정리는 계속 진행)
             if workspace:
                 self.k8s_service.cleanup_function_resources(db_function, workspace)
+                logger.info(f"Cleaned up K8s resources for function {function_id}")
         except K8sServiceError as e:
             # K8s 정리 실패는 로그만 남기고 계속 진행
-            print(f"Failed to cleanup K8s resources: {e}")
+            logger.warning(f"Failed to cleanup K8s resources for function {function_id}: {e}")
 
         # Delete the function and related jobs
         self.db.query(Job).filter(Job.function_id == function_id).delete()

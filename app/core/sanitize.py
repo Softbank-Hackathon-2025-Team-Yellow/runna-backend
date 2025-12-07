@@ -174,9 +174,40 @@ def sanitize_function_id(function_id: str) -> str:
     return function_id
 
 
+def create_workspace_namespace_name(workspace_alias: str, prefix: str = "runna") -> str:
+    """
+    Workspace alias로부터 안전한 namespace 이름을 생성합니다.
+
+    Args:
+        workspace_alias: Workspace 별칭 (이미 sanitize됨)
+        prefix: Namespace prefix (기본값: "runna")
+
+    Returns:
+        Kubernetes에 사용할 준비가 된 안전한 namespace 이름
+
+    Raises:
+        SanitizationError: 입력이 유효하지 않은 경우
+    """
+    if not workspace_alias:
+        raise SanitizationError("Workspace alias는 비어있을 수 없습니다")
+    
+    if not prefix:
+        raise SanitizationError("Prefix는 비어있을 수 없습니다")
+
+    # Namespace 이름 생성
+    namespace = f"{prefix}-{workspace_alias}"
+
+    # 최종 검증
+    validate_namespace_name(namespace)
+
+    return namespace
+
+
 def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     """
     Workspace와 function ID로부터 안전한 namespace 이름을 생성합니다.
+    
+    (Deprecated: 이전 아키텍처용. 새로운 아키텍처에서는 create_workspace_namespace_name 사용)
 
     모든 sanitization 단계를 적용하고 최종 namespace 이름을 생성하는
     편의 함수입니다.
@@ -191,8 +222,8 @@ def create_safe_namespace_name(workspace_name: str, function_id: str) -> str:
     Raises:
         SanitizationError: 입력이 유효하지 않은 경우
     """
-    # Workspace 이름 sanitize
-    safe_workspace = sanitize_workspace_name(workspace_name, strict=True)
+    # Workspace 이름 sanitize (대소문자 정규화 포함)
+    safe_workspace = sanitize_workspace_name(workspace_name.lower(), strict=True)
 
     # Function ID 검증
     safe_function_id = sanitize_function_id(function_id)
@@ -229,17 +260,8 @@ def sanitize_workspace_alias(
     if not name:
         raise SanitizationError("Workspace 이름은 비어있을 수 없습니다")
 
-    # 1. 기본 정규화
-    alias = name.strip().lower()
-
-    # 2. 특수문자를 하이픈으로 변환
-    alias = re.sub(r"[^a-z0-9-]", "-", alias)
-
-    # 3. 연속된 하이픈 제거
-    alias = re.sub(r"-+", "-", alias)
-
-    # 4. 앞뒤 하이픈 제거
-    alias = alias.strip("-")
+    # 1~4. 기본 정규화
+    alias = slugify(name)
 
     # 5. 최대 20자 제한
     if len(alias) > 20:
@@ -301,18 +323,8 @@ def sanitize_function_endpoint(
     if not name:
         raise SanitizationError("Function 이름은 비어있을 수 없습니다")
 
-    # 1. 기본 정규화
-    endpoint = name.strip().lower()
-
-    # 2. 특수문자를 하이픈으로 변환
-    endpoint = re.sub(r"[^a-z0-9-/]", "-", endpoint)
-
-    # 3. 연속된 하이픈/슬래시 제거
-    endpoint = re.sub(r"-+", "-", endpoint)
-    endpoint = re.sub(r"/+", "/", endpoint)
-
-    # 4. 앞뒤 하이픈/슬래시 제거
-    endpoint = endpoint.strip("-").strip("/")
+    # 1~4. 기본 정규화
+    endpoint = slugify(name)
 
     # 5. 최대 99자 제한 (/ prefix를 위해 1자 남김)
     if len(endpoint) > 99:
@@ -417,3 +429,21 @@ def validate_custom_endpoint(endpoint: str) -> str:
         raise SanitizationError("Endpoint는 /만으로 구성될 수 없습니다")
 
     return endpoint
+
+
+def slugify(s) -> str:
+
+    # 1. 기본 정규화
+    s = s.strip().lower()
+
+    # 2. 특수문자를 하이픈으로 변환
+    s = re.sub(r"[^a-z0-9-/]", "-", s)
+
+    # 3. 연속된 하이픈/슬래시 제거
+    s = re.sub(r"-+", "-", s)
+    s = re.sub(r"/+", "/", s)
+
+    # 4. 앞뒤 하이픈/슬래시 제거
+    s = s.strip("-").strip("/")
+
+    return s
