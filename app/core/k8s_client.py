@@ -5,6 +5,7 @@ from kubernetes import client, config
 from kubernetes.client import ApiException
 
 from app.core.k8s_manifests import ManifestBuilder
+from app.core.sanitize import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -125,8 +126,7 @@ class K8sClient:
                     f"✅ KNative Service {service_name} updated successfully "
                     f"(namespace: {namespace})"
                 )
-                return service_name
-                
+                return response
             except ApiException as e:
                 if e.status != 404:
                     raise
@@ -144,7 +144,7 @@ class K8sClient:
                     f"✅ KNative Service {service_name} created successfully "
                     f"(namespace: {namespace})"
                 )
-                return service_name
+                return response
 
         except ApiException as e:
             error_msg = f"Failed to create/update KNative Service {service_name}: {e.reason}"
@@ -212,6 +212,8 @@ class K8sClient:
         Returns:
             삭제 성공 여부
         """
+        service_name = slugify(service_name)
+
         try:
             self.custom_objects.delete_namespaced_custom_object(
                 group="serving.knative.dev",
@@ -451,21 +453,20 @@ class K8sClient:
 
     def create_http_route(
         self,
-        namespace: str,
         hostname: str,
         path: str,
+        service_hostname: str,
         service_name: str,
-        gateway_name: str = "3scale-kourier-gateway",
+        namespace: str = "default",
     ) -> str:
         """
         Gateway API HTTPRoute 생성 또는 업데이트
 
         Args:
-            namespace: HTTPRoute가 생성될 네임스페이스
-            hostname: 라우팅할 호스트명 (예: workspace-alias.runna.haifu.cloud)
+            hostname: 라우팅할 호스트명 (예: workspace.runna.haifu.cloud)
             path: 라우팅할 경로 (예: /my-function)
-            service_name: 백엔드 KNative Service 이름
-            gateway_name: Gateway 이름
+            service_hostname: KNative Service 호스트명
+            service_name: KNative Service 이름
 
         Returns:
             생성/업데이트된 HTTPRoute 이름
@@ -474,8 +475,9 @@ class K8sClient:
             K8sClientError: 생성/업데이트 실패 시
         """
         manifest = ManifestBuilder.build_http_route_manifest(
-            namespace, hostname, path, service_name, gateway_name
+            hostname, path, service_hostname, service_name
         )
+
         route_name = ManifestBuilder.generate_route_name(service_name)
 
         try:
@@ -483,7 +485,7 @@ class K8sClient:
             try:
                 existing_route = self.custom_objects.get_namespaced_custom_object(
                     group="gateway.networking.k8s.io",
-                    version="v1beta1",
+                    version="v1",
                     namespace=namespace,
                     plural="httproutes",
                     name=route_name,
@@ -493,7 +495,7 @@ class K8sClient:
                 logger.info(f"HTTPRoute {route_name} already exists, updating...")
                 self.custom_objects.patch_namespaced_custom_object(
                     group="gateway.networking.k8s.io",
-                    version="v1beta1",
+                    version="v1",
                     namespace=namespace,
                     plural="httproutes",
                     name=route_name,
@@ -510,7 +512,7 @@ class K8sClient:
                 # HTTPRoute가 존재하지 않으면 새로 생성
                 self.custom_objects.create_namespaced_custom_object(
                     group="gateway.networking.k8s.io",
-                    version="v1beta1",
+                    version="v1",
                     namespace=namespace,
                     plural="httproutes",
                     body=manifest,
@@ -524,12 +526,15 @@ class K8sClient:
             logger.error(error_msg)
             raise K8sClientError(error_msg)
 
-    def delete_http_route(self, namespace: str, route_name: str) -> bool:
+    def delete_http_route(
+        self,
+        route_name: str,
+        namespace: str = "default",
+    ) -> bool:
         """
         HTTPRoute 삭제
 
         Args:
-            namespace: HTTPRoute가 위치한 네임스페이스
             route_name: 삭제할 HTTPRoute 이름
 
         Returns:

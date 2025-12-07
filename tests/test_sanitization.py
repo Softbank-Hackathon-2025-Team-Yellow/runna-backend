@@ -9,6 +9,7 @@ import pytest
 from app.core.sanitize import (
     SanitizationError,
     create_safe_namespace_name,
+    create_workspace_namespace_name,
     sanitize_function_id,
     sanitize_workspace_name,
     validate_namespace_name,
@@ -366,3 +367,44 @@ class TestSecurityScenarios:
 
         with pytest.raises(SanitizationError):
             sanitize_workspace_name("work\u200bspace")  # Zero-width space
+
+
+class TestCreateWorkspaceNamespaceName:
+    """Test workspace namespace name creation"""
+
+    def test_valid_workspace_namespace_creation(self):
+        """Valid workspace alias should create valid namespace with prefix"""
+        workspace_alias = "test-workspace"
+        
+        namespace = create_workspace_namespace_name(workspace_alias)
+        
+        assert namespace == "runna-workspace-test-workspace"
+        assert len(namespace) <= 63
+
+    def test_custom_prefix(self):
+        """Custom prefix should be used correctly"""
+        workspace_alias = "myapp"
+        prefix = "custom-prefix"
+        
+        namespace = create_workspace_namespace_name(workspace_alias, prefix)
+        
+        assert namespace == "custom-prefix-myapp"
+
+    def test_empty_workspace_alias_rejected(self):
+        """Empty workspace alias should be rejected"""
+        with pytest.raises(SanitizationError, match="Workspace alias는 비어있을 수 없습니다"):
+            create_workspace_namespace_name("")
+
+    def test_empty_prefix_rejected(self):
+        """Empty prefix should be rejected"""
+        with pytest.raises(SanitizationError, match="Prefix는 비어있을 수 없습니다"):
+            create_workspace_namespace_name("workspace", "")
+
+    def test_resulting_namespace_validation(self):
+        """Final namespace should pass validation"""
+        workspace_alias = "valid-workspace"
+        
+        namespace = create_workspace_namespace_name(workspace_alias)
+        
+        # Should not raise any exception
+        validate_namespace_name(namespace)

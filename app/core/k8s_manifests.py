@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 
 from app.config import settings
 from app.models.function import Function
+from app.core.sanitize import slugify
 
 
 class ManifestBuilder:
@@ -33,7 +34,8 @@ class ManifestBuilder:
         Raises:
             ValueError: 지원하지 않는 runtime인 경우
         """
-        revision_name = f"{function.name}-{uuid.uuid4().hex[:8]}"
+        function_slug = slugify(function.name)
+        revision_name = f"{function_slug}-{uuid.uuid4().hex[:8]}"
 
         # Runtime별 Docker 이미지 선택
         if function.runtime == "PYTHON":
@@ -55,12 +57,13 @@ class ManifestBuilder:
             "apiVersion": "serving.knative.dev/v1",
             "kind": "Service",
             "metadata": {
-                "name": function.name,
+                "name": function_slug,
                 "namespace": namespace,
                 "labels": {
                     "app": "runna",
                     "workspace": function.workspace.alias,
-                    "function": function.name,
+                    "function": str(function.id),
+                    "id": f"{function.workspace.alias}-{function.id}",
                 },
             },
             "spec": {
@@ -144,29 +147,31 @@ class ManifestBuilder:
 
     @staticmethod
     def build_http_route_manifest(
-        namespace: str,
         hostname: str,
         path: str,
+        service_hostname: str,
         service_name: str,
-        gateway_name: str = "3scale-kourier-gateway",
+        namespace: str = "default",
+        gateway_name: str = "yellow-gate",
     ) -> Dict:
         """
         HTTPRoute 매니페스트 생성
-        
+
         Args:
-            namespace: HTTPRoute가 생성될 네임스페이스
-            hostname: 라우팅할 호스트명 (예: workspace-alias.runna.haifu.cloud)
-            path: 라우팅할 경로 (예: /my-function)
-            service_name: 백엔드 KNative Service 이름
-            gateway_name: Gateway 이름
-            
+            hostname: 사용자 접근 호스트명 (예: user2.haifu.cloud)
+            path: 라우팅할 경로 (예: /func2)
+            service_hostname: KNative Service 호스트명 (예: func-py-str.runna-workspace.haifu.cloud)
+            service_name: HTTPRoute 이름에 사용될 서비스 이름
+            namespace: HTTPRoute 네임스페이스 (기본값: default)
+            gateway_name: Gateway 이름 (기본값: yellow-gate)
+
         Returns:
             HTTPRoute 매니페스트
         """
         route_name = f"{service_name}-route"
 
         return {
-            "apiVersion": "gateway.networking.k8s.io/v1beta1",
+            "apiVersion": "gateway.networking.k8s.io/v1",
             "kind": "HTTPRoute",
             "metadata": {"name": route_name, "namespace": namespace},
             "spec": {
@@ -175,9 +180,22 @@ class ManifestBuilder:
                 "rules": [
                     {
                         "matches": [{"path": {"type": "PathPrefix", "value": path}}],
+                        "filters": [
+                            {
+                                "type": "URLRewrite",
+                                "urlRewrite": {
+                                    "path": {
+                                        "type": "ReplacePrefixMatch",
+                                        "replacePrefixMatch": "/",
+                                    },
+                                    "hostname": service_hostname,
+                                },
+                            }
+                        ],
                         "backendRefs": [
                             {
-                                "name": service_name,
+                                "name": "kourier",
+                                "namespace": "knative-serving",
                                 "port": 80,
                             }
                         ],
@@ -189,4 +207,4 @@ class ManifestBuilder:
     @staticmethod
     def generate_route_name(service_name: str) -> str:
         """HTTPRoute 이름 생성 헬퍼"""
-        return f"{service_name}-route"
+        return f"{slugify(service_name)}-route"

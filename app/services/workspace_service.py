@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import timedelta
 from typing import List, Optional
@@ -9,6 +10,9 @@ from app.core.security import create_workspace_token
 from app.models.function import Function
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
+from app.services.k8s_service import K8sService, K8sServiceError
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceService:
@@ -20,6 +24,7 @@ class WorkspaceService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.k8s_service = K8sService(db)
 
     def get_workspace_by_id(self, workspace_id: uuid.UUID) -> Optional[Workspace]:
         """
@@ -103,6 +108,18 @@ class WorkspaceService:
         self.db.add(db_workspace)
         self.db.commit()
         self.db.refresh(db_workspace)
+
+        # K8s 리소스 생성 (Namespace + ClusterDomainClaim)
+        try:
+            self._create_workspace_k8s_resources(db_workspace)
+            logger.info(f"Created K8s resources for workspace {alias}")
+        except Exception as e:
+            logger.error(f"Failed to create K8s resources for workspace {alias}: {e}")
+            # K8s 리소스 생성 실패 시 workspace 삭제 (rollback)
+            self.db.delete(db_workspace)
+            self.db.commit()
+            raise ValueError(f"Failed to create Kubernetes resources: {e}")
+
         return db_workspace
 
     def update_workspace(
@@ -177,6 +194,14 @@ class WorkspaceService:
                 f"Cannot delete workspace with {function_count} functions. Delete functions first."
             )
 
+        # K8s 리소스 정리
+        try:
+            self._cleanup_workspace_k8s_resources(workspace)
+            logger.info(f"Cleaned up K8s resources for workspace {workspace.alias}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup K8s resources for workspace {workspace.alias}: {e}")
+            # K8s 정리 실패해도 DB 삭제는 계속 진행
+
         self.db.delete(workspace)
         self.db.commit()
         return True
@@ -248,3 +273,28 @@ class WorkspaceService:
             "created_at": workspace.created_at,
             "updated_at": workspace.updated_at,
         }
+
+    def _create_workspace_k8s_resources(self, workspace: Workspace) -> None:
+        """
+        Workspace를 위한 K8s 리소스 생성
+        
+        Args:
+            workspace: 워크스페이스 객체
+            
+        Raises:
+            K8sServiceError: K8s 리소스 생성 실패 시
+        """
+        self.k8s_service.create_workspace_namespace(
+            workspace_alias=workspace.alias
+        )
+
+    def _cleanup_workspace_k8s_resources(self, workspace: Workspace) -> None:
+        """
+        Workspace의 K8s 리소스 정리
+        
+        Args:
+            workspace: 워크스페이스 객체
+        """
+        self.k8s_service.delete_workspace_namespace(
+            workspace_alias=workspace.alias
+        )
