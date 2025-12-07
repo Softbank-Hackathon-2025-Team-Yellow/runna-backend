@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     base_domain: str = "runna.haifu.cloud"
 
     # Runtime별 Docker 이미지
-    k8s_python_image: str = "docker.io/sbyellow/python-runner:v1"
-    k8s_nodejs_image: str = "docker.io/sbyellow/node-runner:v1"
+    k8s_python_image: str = "docker.io/sbyellow/python-runner:v2"
+    k8s_nodejs_image: str = "docker.io/sbyellow/node-runner:v2"
 
     # K8s 리소스 제한
     k8s_cpu_request: str = "100m"
@@ -60,9 +60,6 @@ class Settings(BaseSettings):
     # KNative 오토스케일링
     knative_min_scale: str = "1"
     knative_max_scale: str = "10"
-
-    # Gateway API 설정
-    gateway_name: str = "3scale-kourier-gateway"
 
     @field_validator("secret_key", mode="before")
     @classmethod

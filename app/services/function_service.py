@@ -103,6 +103,7 @@ class FunctionService:
         # 4. DB에 Function 생성
         function_dict = function_data.model_dump()
         function_dict["endpoint"] = endpoint  # endpoint 추가
+        function_dict["execution_type"] = "SYNC"  # execution type SYNC로 고정
         db_function = Function(**function_dict)
         self.db.add(db_function)
         self.db.commit()
