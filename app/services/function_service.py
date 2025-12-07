@@ -66,7 +66,21 @@ class FunctionService:
                 f"Code analysis failed: {', '.join(analysis_result['violations'])}"
             )
 
-        # 2. endpoint 생성 또는 검증
+        # 2. Function name 중복 확인 (workspace 내)
+        existing_function = (
+            self.db.query(Function)
+            .filter(
+                Function.workspace_id == function_data.workspace_id,
+                Function.name == function_data.name
+            )
+            .first()
+        )
+        if existing_function:
+            raise ValueError(
+                f"Function with name '{function_data.name}' already exists in this workspace"
+            )
+
+        # 3. endpoint 생성 또는 검증
         if function_data.endpoint and function_data.endpoint.strip():
             # 사용자가 custom endpoint 제공 (빈 문자열 제외)
             endpoint = validate_custom_endpoint(function_data.endpoint)
@@ -86,7 +100,7 @@ class FunctionService:
                 max_attempts=10,
             )
 
-        # 3. DB에 Function 생성
+        # 4. DB에 Function 생성
         function_dict = function_data.model_dump()
         function_dict["endpoint"] = endpoint  # endpoint 추가
         db_function = Function(**function_dict)
@@ -94,7 +108,7 @@ class FunctionService:
         self.db.commit()
         self.db.refresh(db_function)
 
-        # 4. Workspace 정보 조회
+        # 5. Workspace 정보 조회
         workspace = (
             self.db.query(Workspace)
             .filter(Workspace.id == db_function.workspace_id)
@@ -143,18 +157,39 @@ class FunctionService:
                     f"Code analysis failed: {', '.join(analysis_result['violations'])}"
                 )
 
-        # endpoint 검증 및 변경
-        if "endpoint" in update_data:
-            new_endpoint = validate_custom_endpoint(update_data["endpoint"])
+        # name 검증 및 변경
+        if "name" in update_data:
+            new_name = update_data["name"]
             # Workspace 내 중복 확인 (자신 제외)
-            existing = self.get_function_by_workspace_and_endpoint(
-                db_function.workspace_id, new_endpoint
+            existing = (
+                self.db.query(Function)
+                .filter(
+                    Function.workspace_id == db_function.workspace_id,
+                    Function.name == new_name
+                )
+                .first()
             )
             if existing and existing.id != db_function.id:
                 raise ValueError(
-                    f"Endpoint '{new_endpoint}' already exists in this workspace"
+                    f"Function with name '{new_name}' already exists in this workspace"
                 )
-            update_data["endpoint"] = new_endpoint
+
+        # endpoint 검증 및 변경
+        if "endpoint" in update_data:
+            # endpoint가 빈 값(None 또는 빈 문자열)이면 현재 endpoint 유지
+            if not update_data["endpoint"] or not update_data["endpoint"].strip():
+                del update_data["endpoint"]
+            else:
+                new_endpoint = validate_custom_endpoint(update_data["endpoint"])
+                # Workspace 내 중복 확인 (자신 제외)
+                existing = self.get_function_by_workspace_and_endpoint(
+                    db_function.workspace_id, new_endpoint
+                )
+                if existing and existing.id != db_function.id:
+                    raise ValueError(
+                        f"Endpoint '{new_endpoint}' already exists in this workspace"
+                    )
+                update_data["endpoint"] = new_endpoint
 
         for field, value in update_data.items():
             setattr(db_function, field, value)
