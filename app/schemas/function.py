@@ -11,7 +11,7 @@ class FunctionBase(BaseModel):
     name: str
     runtime: Runtime
     code: str
-    execution_type: ExecutionType
+    # execution_type: ExecutionType
 
 
 class FunctionCreate(FunctionBase):
@@ -23,7 +23,7 @@ class FunctionUpdate(BaseModel):
     name: Optional[str] = None
     runtime: Optional[Runtime] = None
     code: Optional[str] = None
-    execution_type: Optional[ExecutionType] = None
+    # execution_type: Optional[ExecutionType] = None
     endpoint: Optional[str] = None  # endpoint 수정 가능
 
 
