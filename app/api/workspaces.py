@@ -193,7 +193,47 @@ def delete_workspace(
         return create_error_response("INTERNAL_ERROR", "Internal server error")
 
 
-@router.post("/{workspace_id}/auth-keys", response_model=dict)
+@router.get("/{workspace_id}/api-key", response_model=dict)
+def get_workspace_api_key(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    워크스페이스 API Key 조회
+    
+    Args:
+        workspace_id: 워크스페이스 UUID
+        db: 데이터베이스 세션
+        current_user: 인증된 현재 사용자
+        
+    Returns:
+        워크스페이스 API Key
+    """
+    try:
+        service = WorkspaceService(db)
+        workspace = service.get_workspace_by_id(workspace_id)
+        
+        if not workspace:
+            return create_error_response(
+                "WORKSPACE_NOT_FOUND", f"Workspace with id {workspace_id} not found"
+            )
+        
+        # 소유권 검증
+        if workspace.user_id != current_user.id:
+            return create_error_response(
+                "ACCESS_DENIED", "You don't have permission to access this workspace"
+            )
+        
+        return create_success_response({
+            "workspace_id": str(workspace_id),
+            "api_key": str(workspace.api_key)
+        })
+    except Exception:
+        return create_error_response("INTERNAL_ERROR", "Internal server error")
+
+
+@router.post("/{workspace_id}/auth-keys", response_model=dict, deprecated=True)
 def generate_workspace_auth_key(
     workspace_id: uuid.UUID,
     expires_hours: Optional[int] = Body(default=None, embed=True),
@@ -201,11 +241,10 @@ def generate_workspace_auth_key(
     current_user: User = Depends(get_current_user),
 ):
     """
-    워크스페이스 인증키 발급
+    워크스페이스 인증키 발급 (DEPRECATED: workspace 생성 시 자동 발급됨, GET /api-key 사용 권장)
 
     Args:
         workspace_id: 워크스페이스 UUID
-        expires_hours: 만료 시간(시간 단위, 기본값 24시간)
         db: 데이터베이스 세션
         current_user: 인증된 현재 사용자
 

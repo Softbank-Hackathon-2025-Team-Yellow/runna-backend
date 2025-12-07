@@ -76,6 +76,19 @@ class WorkspaceAuthKey(BaseModel):
     expires_at: Optional[datetime] = None
 
 
+class WorkspaceApiKey(BaseModel):
+    """
+    Workspace API Key 응답 스키마
+    
+    Args:
+        workspace_id: 워크스페이스 UUID
+        api_key: 워크스페이스 API 키
+    """
+    
+    workspace_id: uuid.UUID
+    api_key: uuid.UUID
+    
+
 class WorkspaceWithFunctionCount(WorkspaceResponse):
     """
     Function 개수가 포함된 Workspace 응답 스키마
